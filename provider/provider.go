@@ -1,4 +1,3 @@
-// Package provider provide signing methods that are used to sign the Authorization Credential (VC-JWT).
-//
-// In Auth SDK, provider primarily supplies signing capabilities: local private key signer or Vault signer.
+// Package provider implements signing methods for Authorization Credentials (VC-JWT) in the Auth SDK,
+// supporting both local private key and Vault-based signers.
 package provider
