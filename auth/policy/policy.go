@@ -8,61 +8,120 @@
 //   - Validation utilities to ensure policies are well-formed
 //   - Matching/evaluation helpers for services to enforce authorization decisions
 //
+// NewPolicy accepts options; if no allow list option is provided, it uses
+// DefaultAllowList() automatically.
+//
 // Example usage:
 //
-//	policy := NewPolicy()
-//	policy.AddAllow(
-//		[]Action{NewAction("Issuer:Create")},
-//		[]Resource{NewResource(ResourceObjectIssuer)},
-//		NewCondition(),
+//	customAllow := NewAllowList(
+//		[]ActionObject{ActionObjectIssuer},
+//		[]ActionVerb{ActionVerbCreate},
+//		[]ResourceObject{ResourceObjectIssuer},
 //	)
-//	if policy.Allows(NewAction("Issuer:Create"), NewResource(ResourceObjectIssuer)) {
-//		// Access granted
-//	}
+//	policy := NewPolicy(
+//		WithAllowList(customAllow),
+//		WithStatements(
+//			NewStatement(
+//				EffectAllow,
+//				[]Action{NewAction("Issuer:Create")},
+//				[]Resource{NewResource(ResourceObjectIssuer)},
+//				NewCondition(),
+//			),
+//		),
+//	)
 package policy
 
-const (
-	// AdminAction represents all actions (wildcard).
-	AllAction string = "*"
-	// AdminResource represents all resources (wildcard).
-	AllResource string = "*"
-)
+// AdminList represents a list of action objects, action verbs, and resource objects that are allowed to construct permission statements.
+type AllowList struct {
+	ActionObjects   []ActionObject   `json:"actionObjects"`
+	ActionVerbs     []ActionVerb     `json:"actionVerbs"`
+	ResourceObjects []ResourceObject `json:"resourceObjects"`
+}
+
+// PolicyOption configures a Policy during construction.
+type PolicyOption func(*Policy)
+
+// WithAllowList sets a custom allow list for the policy.
+// If allowList is zero-value, the policy keeps the default allow list.
+func WithAllowList(allowList AllowList) PolicyOption {
+	return func(p *Policy) {
+		if len(allowList.ActionObjects) == 0 &&
+			len(allowList.ActionVerbs) == 0 &&
+			len(allowList.ResourceObjects) == 0 {
+			return
+		}
+		p.AllowList = allowList
+	}
+}
+
+// WithStatements appends permission statements to the policy.
+func WithStatements(statements ...Statement) PolicyOption {
+	return func(p *Policy) {
+		p.Permissions = append(p.Permissions, statements...)
+	}
+}
+
+// NewAllowList constructs a AllowList from the given action objects, action verbs, and resource objects.
+func NewAllowList(actionObjects []ActionObject, actionVerbs []ActionVerb, resourceObjects []ResourceObject) AllowList {
+	return AllowList{
+		ActionObjects:   actionObjects,
+		ActionVerbs:     actionVerbs,
+		ResourceObjects: resourceObjects,
+	}
+}
+
+// DefaultAllowList constructs a AllowList with the default action objects, action verbs, and resource objects.
+func DefaultAllowList() AllowList {
+	return AllowList{
+		ActionObjects:   []ActionObject{ActionObjectIssuer, ActionObjectDid, ActionObjectSchema, ActionObjectCredential, ActionObjectPresentation, ActionObjectAccessibleCredential, ActionObjectProvider, ActionObjectBaseSchema},
+		ActionVerbs:     []ActionVerb{ActionVerbCreate, ActionVerbUpdate, ActionVerbDelete, ActionVerbRevoke, ActionVerbUpdateInfo, ActionVerbUpdatePermissions, ActionVerbGrantCreate, ActionVerbGrantUpdate, ActionVerbGrantDelete, ActionVerbGrantRevoke, ActionVerbGrantUpdateInfo, ActionVerbGrantUpdatePermissions},
+		ResourceObjects: []ResourceObject{ResourceObjectIssuer, ResourceObjectDid, ResourceObjectSchema, ResourceObjectCredential, ResourceObjectPresentation, ResourceObjectAccessibleCredential, ResourceObjectProvider, ResourceObjectBaseSchema},
+	}
+}
 
 // Policy represents a collection of permission statements.
 type Policy struct {
 	Permissions []Statement `json:"permissions"`
+	AllowList   AllowList   `json:"allowList"`
 }
 
-// NewPolicy constructs a Policy from the given statements.
-func NewPolicy(statements ...Statement) Policy {
-	return Policy{
-		Permissions: statements,
+// NewPolicy constructs a Policy from the given options.
+// If no allow list option is provided, it defaults to DefaultAllowList().
+func NewPolicy(options ...PolicyOption) Policy {
+	p := Policy{
+		AllowList: DefaultAllowList(),
 	}
-}
-
-// AddStatement appends a single statement to the policy.
-func (p *Policy) AddStatement(statement Statement) {
-	p.Permissions = append(p.Permissions, statement)
+	for _, opt := range options {
+		if opt == nil {
+			continue
+		}
+		opt(&p)
+	}
+	return p
 }
 
 // AddAllow adds an allow statement with the given actions, resources, and conditions.
 func (p *Policy) AddAllow(actions []Action, resources []Resource, conditions Condition) {
-	p.AddStatement(Statement{
-		Effect:     EffectAllow,
-		Actions:    actions,
-		Resources:  resources,
-		Conditions: conditions,
-	})
+	p.Permissions = append(p.Permissions,
+		Statement{
+			Effect:     EffectAllow,
+			Actions:    actions,
+			Resources:  resources,
+			Conditions: conditions,
+		},
+	)
 }
 
 // AddDeny adds a deny statement with the given actions, resources, and conditions.
 func (p *Policy) AddDeny(actions []Action, resources []Resource, conditions Condition) {
-	p.AddStatement(Statement{
-		Effect:     EffectDeny,
-		Actions:    actions,
-		Resources:  resources,
-		Conditions: conditions,
-	})
+	p.Permissions = append(p.Permissions,
+		Statement{
+			Effect:     EffectDeny,
+			Actions:    actions,
+			Resources:  resources,
+			Conditions: conditions,
+		},
+	)
 }
 
 // IsEmpty reports whether the policy has no statements.
@@ -70,20 +129,11 @@ func (p Policy) IsEmpty() bool {
 	return len(p.Permissions) == 0
 }
 
-// EffectFor returns the resulting effect for the given action and resource.
-// It evaluates deny statements before allow statements and respects
-// wildcard patterns. Conditions are not evaluated (use EffectForWithAttributes
-// to evaluate conditions). The second return value reports whether any
-// statement matched.
-func (p Policy) EffectFor(action, resource string) (Effect, bool) {
-	return p.EffectForWithAttributes(action, resource, nil)
-}
-
-// EffectForWithAttributes returns the resulting effect for the given action,
+// effectFor returns the resulting effect for the given action,
 // resource, and attributes. It evaluates deny statements before allow statements,
 // respects wildcard patterns, and evaluates conditions if provided.
 // The second return value reports whether any statement matched.
-func (p Policy) EffectForWithAttributes(action, resource string, attrs map[string]string) (Effect, bool) {
+func (p Policy) effectFor(action, resource string) (Effect, bool) {
 	// Evaluate deny statements first
 	for _, stmt := range p.Permissions {
 		if stmt.Effect != EffectDeny {
@@ -95,10 +145,7 @@ func (p Policy) EffectForWithAttributes(action, resource string, attrs map[strin
 		if !AnyResourceMatches(stmt.Resources, resource) {
 			continue
 		}
-		// Check conditions if present
-		if len(stmt.Conditions) > 0 && !stmt.Conditions.Matches(attrs) {
-			continue
-		}
+
 		return EffectDeny, true
 	}
 
@@ -113,10 +160,7 @@ func (p Policy) EffectForWithAttributes(action, resource string, attrs map[strin
 		if !AnyResourceMatches(stmt.Resources, resource) {
 			continue
 		}
-		// Check conditions if present
-		if len(stmt.Conditions) > 0 && !stmt.Conditions.Matches(attrs) {
-			continue
-		}
+
 		return EffectAllow, true
 	}
 
@@ -127,15 +171,7 @@ func (p Policy) EffectForWithAttributes(action, resource string, attrs map[strin
 // Deny statements take precedence over allow statements.
 // Conditions are not evaluated (use AllowsWithAttributes to evaluate conditions).
 func (p Policy) Allows(action Action, resource Resource) bool {
-	eff, ok := p.EffectFor(action.String(), resource.String())
-	return ok && eff == EffectAllow
-}
-
-// AllowsWithAttributes reports whether the policy allows the given action on the
-// given resource with the provided attributes for condition evaluation.
-// Deny statements take precedence over allow statements.
-func (p Policy) AllowsWithAttributes(action Action, resource Resource, attrs map[string]string) bool {
-	eff, ok := p.EffectForWithAttributes(action.String(), resource.String(), attrs)
+	eff, ok := p.effectFor(action.String(), resource.String())
 	return ok && eff == EffectAllow
 }
 
@@ -160,7 +196,7 @@ func (p Policy) AllowStatement(stmt Statement) bool {
 // A policy is valid if all its statements are valid.
 func (p Policy) IsValid() bool {
 	for _, stmt := range p.Permissions {
-		if !stmt.IsValid() {
+		if !stmt.isValid(p.AllowList) {
 			return false
 		}
 	}
@@ -169,7 +205,7 @@ func (p Policy) IsValid() bool {
 
 // matchObject checks if the action object matches the resource object.
 func matchObject(action Action, resource Resource) bool {
-	if string(action) == AllAction || string(resource) == AllResource {
+	if action == AllAction || resource == AllResource {
 		return true
 	}
 

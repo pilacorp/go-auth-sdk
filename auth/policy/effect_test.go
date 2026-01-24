@@ -7,7 +7,7 @@ func TestEffect_NewEffectAndIsValid(t *testing.T) {
 	if eAllow != EffectAllow {
 		t.Errorf("NewEffect(\"allow\") = %v, want %v", eAllow, EffectAllow)
 	}
-	if !eAllow.IsValid() {
+	if !eAllow.isValid() {
 		t.Errorf("EffectAllow.IsValid() = false, want true")
 	}
 
@@ -15,7 +15,7 @@ func TestEffect_NewEffectAndIsValid(t *testing.T) {
 	if eDeny != EffectDeny {
 		t.Errorf("NewEffect(\"deny\") = %v, want %v", eDeny, EffectDeny)
 	}
-	if !eDeny.IsValid() {
+	if !eDeny.isValid() {
 		t.Errorf("EffectDeny.IsValid() = false, want true")
 	}
 
@@ -23,7 +23,7 @@ func TestEffect_NewEffectAndIsValid(t *testing.T) {
 	if eCustom != Effect("custom") {
 		t.Errorf("NewEffect(\"custom\") = %v, want %v", eCustom, Effect("custom"))
 	}
-	if eCustom.IsValid() {
+	if eCustom.isValid() {
 		t.Errorf("Effect(\"custom\").IsValid() = true, want false")
 	}
 }

@@ -5,16 +5,16 @@ import "testing"
 func TestNewPolicy(t *testing.T) {
 	s1 := Statement{
 		Effect:    EffectAllow,
-		Actions:   []Action{NewAction("issuer:*")},
+		Actions:   []Action{NewAction("Issuer:*")},
 		Resources: []Resource{NewResource(ResourceObjectIssuer)},
 	}
 	s2 := Statement{
 		Effect:    EffectDeny,
-		Actions:   []Action{NewAction("issuer:updateInfo")},
+		Actions:   []Action{NewAction("Issuer:UpdateInfo")},
 		Resources: []Resource{NewResource(ResourceObjectIssuer)},
 	}
 
-	p := NewPolicy(s1, s2)
+	p := NewPolicy(WithStatements(s1, s2))
 
 	if len(p.Permissions) != 2 {
 		t.Fatalf("NewPolicy() len = %d, want %d", len(p.Permissions), 2)
@@ -76,7 +76,7 @@ func TestPolicy_AddStatement(t *testing.T) {
 		Resources: []Resource{NewResource(ResourceObjectIssuer)},
 	}
 
-	p.AddStatement(s)
+	p.Permissions = append(p.Permissions, s)
 
 	if p.IsEmpty() {
 		t.Fatalf("policy IsEmpty() = true, want false")

@@ -1,6 +1,9 @@
 package policy
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // Resource represents a resource identifier or pattern.
 // Resources follow the format "Object:Suffix" (e.g., "Issuer:*", "Credential:123").
@@ -23,6 +26,7 @@ func NewObjectResource(object ResourceObject, suffix string) Resource {
 	if suffix == "" {
 		return Resource(string(object) + ":*")
 	}
+
 	return Resource(string(object) + ":" + suffix)
 }
 
@@ -45,35 +49,19 @@ func AnyResourceMatches(resources []Resource, target string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
-// IsValid checks if the resource is valid.
+// isValid checks if the resource is valid.
 // Uses the constant set via SetCustomConstant() if available,
 // otherwise uses the default policy constant.
-func (r Resource) IsValid() bool {
-	if r.String() == "*" {
-		return true
-	}
-	c := getActiveConstant()
-	return r.IsValidWith(c)
-}
-
-// IsValidWith checks if the resource is valid using the provided policy constants.
-// If c is the zero-value, it falls back to DefaultPolicyConstant().
-func (r Resource) IsValidWith(c PolicyConstant) bool {
-	if r.String() == "*" {
+func (r Resource) isValid(allowList AllowList) bool {
+	if r == AllResource {
 		return true
 	}
 
-	c = c.OrDefault()
-	objectResource := Resource(r.Object())
-	for _, object := range c.ResourceObject {
-		if objectResource.Matches(string(object)) {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowList.ResourceObjects, r.Object())
 }
 
 // Object returns the object part of the resource.
@@ -83,6 +71,7 @@ func (r Resource) Object() ResourceObject {
 	if len(parts) == 0 {
 		return ResourceObject("")
 	}
+
 	return ResourceObject(parts[0])
 }
 
@@ -93,6 +82,7 @@ func (r Resource) Suffix() string {
 	if len(parts) < 2 {
 		return ""
 	}
+
 	return parts[1]
 }
 
@@ -103,5 +93,6 @@ func ToListResources(resources []string) []Resource {
 	for _, resource := range resources {
 		listResources = append(listResources, Resource(resource))
 	}
+
 	return listResources
 }

@@ -37,11 +37,11 @@ func (s *Statement) SetConditions(conditions Condition) {
 	s.Conditions = conditions
 }
 
-// IsValid checks if the statement is valid.
-func (s *Statement) IsValid() bool {
+// isValid checks if the statement is valid.
+func (s *Statement) isValid(allowList AllowList) bool {
 	isActionValid := true
 	for _, action := range s.Actions {
-		if !action.IsValid() {
+		if !action.isValid(allowList) {
 			isActionValid = false
 			break
 		}
@@ -49,13 +49,13 @@ func (s *Statement) IsValid() bool {
 
 	isResourceValid := true
 	for _, resource := range s.Resources {
-		if !resource.IsValid() {
+		if !resource.isValid(allowList) {
 			isResourceValid = false
 			break
 		}
 	}
 
-	return s.Effect.IsValid() && isActionValid && isResourceValid
+	return s.Effect.isValid() && isActionValid && isResourceValid
 }
 
 // ToResourceStringList returns the string representation of the resource.

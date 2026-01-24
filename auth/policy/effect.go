@@ -4,13 +4,6 @@ package policy
 // An effect determines whether a statement allows or denies access.
 type Effect string
 
-const (
-	// EffectAllow indicates that the statement allows the specified actions on the specified resources.
-	EffectAllow Effect = "allow"
-	// EffectDeny indicates that the statement denies the specified actions on the specified resources.
-	EffectDeny Effect = "deny"
-)
-
 // NewEffect constructs an Effect from the given string, normalizing known values.
 // If the value is "allow" or "deny" (case-sensitive), it returns the corresponding constant.
 // Otherwise, it returns an Effect with the given value (which will not be valid).
@@ -25,7 +18,7 @@ func NewEffect(value string) Effect {
 	}
 }
 
-// IsValid reports whether the effect is one of the known valid values (EffectAllow or EffectDeny).
-func (e Effect) IsValid() bool {
+// isValid reports whether the effect is one of the known valid values (EffectAllow or EffectDeny).
+func (e Effect) isValid() bool {
 	return e == EffectAllow || e == EffectDeny
 }
