@@ -24,10 +24,10 @@ func NewResource(object ResourceObject) Resource {
 // Example: NewObjectResource(ResourceObjectCredential, "123") returns "Credential:123".
 func NewObjectResource(object ResourceObject, suffix string) Resource {
 	if suffix == "" {
-		return Resource(string(object) + ":*")
+		return Resource(string(object) + Separator + "*")
 	}
 
-	return Resource(string(object) + ":" + suffix)
+	return Resource(string(object) + Separator + suffix)
 }
 
 // String returns the underlying string value of the resource.
@@ -56,18 +56,18 @@ func AnyResourceMatches(resources []Resource, target string) bool {
 // isValid checks if the resource is valid.
 // Uses the constant set via SetCustomConstant() if available,
 // otherwise uses the default policy constant.
-func (r Resource) isValid(allowList AllowList) bool {
-	if r == AllResource {
+func (r Resource) isValid(specification Specification) bool {
+	if r == ResourceAll {
 		return true
 	}
 
-	return slices.Contains(allowList.ResourceObjects, r.Object())
+	return slices.Contains(specification.ResourceObjects, r.Object())
 }
 
 // Object returns the object part of the resource.
 // If the resource doesn't contain a colon, it returns the entire resource string.
 func (r Resource) Object() ResourceObject {
-	parts := strings.SplitN(r.String(), ":", 2)
+	parts := strings.SplitN(r.String(), Separator, 2)
 	if len(parts) == 0 {
 		return ResourceObject("")
 	}
@@ -78,7 +78,7 @@ func (r Resource) Object() ResourceObject {
 // Suffix returns the suffix part of the resource (everything after the colon).
 // If the resource doesn't contain a colon, it returns an empty string.
 func (r Resource) Suffix() string {
-	parts := strings.SplitN(r.String(), ":", 2)
+	parts := strings.SplitN(r.String(), Separator, 2)
 	if len(parts) < 2 {
 		return ""
 	}

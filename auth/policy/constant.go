@@ -42,12 +42,17 @@ const (
 
 // Predefine object and verb used for admin actions and resources.
 const (
-	AllAction   Action   = "*"
-	AllResource Resource = "*"
+	ActionAll   Action   = "*"
+	ResourceAll Resource = "*"
 )
 
 // Predefined effect constants.
 const (
 	EffectAllow Effect = "allow" // Allow access to the resource.
 	EffectDeny  Effect = "deny"  // Deny access to the resource.
+)
+
+// Predefined split character constants.
+const (
+	Separator string = ":"
 )

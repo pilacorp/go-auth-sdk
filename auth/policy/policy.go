@@ -9,17 +9,17 @@
 //   - Matching/evaluation helpers for services to enforce authorization decisions
 //
 // NewPolicy accepts options; if no allow list option is provided, it uses
-// DefaultAllowList() automatically.
+// DefaultSpecification() automatically.
 //
 // Example usage:
 //
-//	customAllow := NewAllowList(
+//	customSpecification := NewSpecification(
 //		[]ActionObject{ActionObjectIssuer},
 //		[]ActionVerb{ActionVerbCreate},
 //		[]ResourceObject{ResourceObjectIssuer},
 //	)
 //	policy := NewPolicy(
-//		WithAllowList(customAllow),
+//		WithSpecification(customSpecification),
 //		WithStatements(
 //			NewStatement(
 //				EffectAllow,
@@ -31,26 +31,19 @@
 //	)
 package policy
 
-// AdminList represents a list of action objects, action verbs, and resource objects that are allowed to construct permission statements.
-type AllowList struct {
-	ActionObjects   []ActionObject   `json:"actionObjects"`
-	ActionVerbs     []ActionVerb     `json:"actionVerbs"`
-	ResourceObjects []ResourceObject `json:"resourceObjects"`
-}
-
 // PolicyOption configures a Policy during construction.
 type PolicyOption func(*Policy)
 
-// WithAllowList sets a custom allow list for the policy.
-// If allowList is zero-value, the policy keeps the default allow list.
-func WithAllowList(allowList AllowList) PolicyOption {
+// WithSpecification sets a custom specification for the policy.
+// If specification is zero-value, the policy keeps the default specification.
+func WithSpecification(specification Specification) PolicyOption {
 	return func(p *Policy) {
-		if len(allowList.ActionObjects) == 0 &&
-			len(allowList.ActionVerbs) == 0 &&
-			len(allowList.ResourceObjects) == 0 {
+		if len(specification.ActionObjects) == 0 &&
+			len(specification.ActionVerbs) == 0 &&
+			len(specification.ResourceObjects) == 0 {
 			return
 		}
-		p.AllowList = allowList
+		p.Specification = specification
 	}
 }
 
@@ -61,35 +54,17 @@ func WithStatements(statements ...Statement) PolicyOption {
 	}
 }
 
-// NewAllowList constructs a AllowList from the given action objects, action verbs, and resource objects.
-func NewAllowList(actionObjects []ActionObject, actionVerbs []ActionVerb, resourceObjects []ResourceObject) AllowList {
-	return AllowList{
-		ActionObjects:   actionObjects,
-		ActionVerbs:     actionVerbs,
-		ResourceObjects: resourceObjects,
-	}
-}
-
-// DefaultAllowList constructs a AllowList with the default action objects, action verbs, and resource objects.
-func DefaultAllowList() AllowList {
-	return AllowList{
-		ActionObjects:   []ActionObject{ActionObjectIssuer, ActionObjectDid, ActionObjectSchema, ActionObjectCredential, ActionObjectPresentation, ActionObjectAccessibleCredential, ActionObjectProvider, ActionObjectBaseSchema},
-		ActionVerbs:     []ActionVerb{ActionVerbCreate, ActionVerbUpdate, ActionVerbDelete, ActionVerbRevoke, ActionVerbUpdateInfo, ActionVerbUpdatePermissions, ActionVerbGrantCreate, ActionVerbGrantUpdate, ActionVerbGrantDelete, ActionVerbGrantRevoke, ActionVerbGrantUpdateInfo, ActionVerbGrantUpdatePermissions},
-		ResourceObjects: []ResourceObject{ResourceObjectIssuer, ResourceObjectDid, ResourceObjectSchema, ResourceObjectCredential, ResourceObjectPresentation, ResourceObjectAccessibleCredential, ResourceObjectProvider, ResourceObjectBaseSchema},
-	}
-}
-
 // Policy represents a collection of permission statements.
 type Policy struct {
-	Permissions []Statement `json:"permissions"`
-	AllowList   AllowList   `json:"allowList"`
+	Permissions   []Statement   `json:"permissions"`
+	Specification Specification `json:"specification"`
 }
 
 // NewPolicy constructs a Policy from the given options.
-// If no allow list option is provided, it defaults to DefaultAllowList().
+// If no specification option is provided, it defaults to DefaultSpecification().
 func NewPolicy(options ...PolicyOption) Policy {
 	p := Policy{
-		AllowList: DefaultAllowList(),
+		Specification: DefaultSpecification(),
 	}
 	for _, opt := range options {
 		if opt == nil {
@@ -196,7 +171,7 @@ func (p Policy) AllowStatement(stmt Statement) bool {
 // A policy is valid if all its statements are valid.
 func (p Policy) IsValid() bool {
 	for _, stmt := range p.Permissions {
-		if !stmt.isValid(p.AllowList) {
+		if !stmt.isValid(p.Specification) {
 			return false
 		}
 	}
@@ -205,7 +180,7 @@ func (p Policy) IsValid() bool {
 
 // matchObject checks if the action object matches the resource object.
 func matchObject(action Action, resource Resource) bool {
-	if action == AllAction || resource == AllResource {
+	if action == ActionAll || resource == ResourceAll {
 		return true
 	}
 

@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-const splitChar = ":"
-
 // Action represents a permission action pattern.
 // Actions follow the format "Object:Verb" (e.g., "Issuer:Create", "Credential:Update").
 // The wildcard "*" represents all actions.
@@ -27,7 +25,7 @@ func NewAction(value string) Action {
 // NewObjectAction constructs an Action from an object and a verb.
 // Example: NewObjectAction(ActionObjectIssuer, ActionVerbCreate) returns "Issuer:Create".
 func NewObjectAction(object ActionObject, verb ActionVerb) Action {
-	return Action(string(object) + splitChar + string(verb))
+	return Action(string(object) + Separator + string(verb))
 }
 
 // String returns the underlying string value of the action.
@@ -38,7 +36,7 @@ func (a Action) String() string {
 // Object returns the object part of the action (everything before the colon).
 // Returns an empty string if the action doesn't contain a colon.
 func (a Action) Object() string {
-	parts := strings.SplitN(string(a), splitChar, 2)
+	parts := strings.SplitN(string(a), Separator, 2)
 	if len(parts) != 2 {
 		return ""
 	}
@@ -49,7 +47,7 @@ func (a Action) Object() string {
 // Verb returns the verb part of the action (everything after the colon).
 // Returns an empty string if the action doesn't contain a colon.
 func (a Action) Verb() string {
-	parts := strings.SplitN(string(a), splitChar, 2)
+	parts := strings.SplitN(string(a), Separator, 2)
 	if len(parts) != 2 {
 		return ""
 	}
@@ -78,34 +76,34 @@ func AnyActionMatches(actions []Action, target string) bool {
 // isValid checks if the action is valid.
 // Uses the constant set via SetCustomConstant() if available,
 // otherwise uses the default policy constant.
-func (a Action) isValid(allowList AllowList) bool {
-	if a == AllAction {
+func (a Action) isValid(specification Specification) bool {
+	if a == ActionAll {
 		return true
 	}
 
-	return a.isValidObject(allowList) && a.isValidVerb(allowList)
+	return a.isValidObject(specification) && a.isValidVerb(specification)
 }
 
 // isValidObject checks if the object of the action is valid.
 // Uses the constant set via SetCustomConstant() if available,
 // otherwise uses the default policy constant.
-func (a Action) isValidObject(allowList AllowList) bool {
-	if a == AllAction {
+func (a Action) isValidObject(specification Specification) bool {
+	if a == ActionAll {
 		return true
 	}
 
-	return slices.Contains(allowList.ActionObjects, ActionObject(a.Object()))
+	return slices.Contains(specification.ActionObjects, ActionObject(a.Object()))
 }
 
 // isValidVerb checks if the verb of the action is valid.
 // Uses the constant set via SetCustomConstant() if available,
 // otherwise uses the default policy constant.
-func (a Action) isValidVerb(allowList AllowList) bool {
-	if a == AllAction {
+func (a Action) isValidVerb(specification Specification) bool {
+	if a == ActionAll {
 		return true
 	}
 
-	return slices.Contains(allowList.ActionVerbs, ActionVerb(a.Verb()))
+	return slices.Contains(specification.ActionVerbs, ActionVerb(a.Verb()))
 }
 
 // ToListActions converts a slice of strings to a slice of Action.

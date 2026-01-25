@@ -38,10 +38,10 @@ func (s *Statement) SetConditions(conditions Condition) {
 }
 
 // isValid checks if the statement is valid.
-func (s *Statement) isValid(allowList AllowList) bool {
+func (s *Statement) isValid(specification Specification) bool {
 	isActionValid := true
 	for _, action := range s.Actions {
-		if !action.isValid(allowList) {
+		if !action.isValid(specification) {
 			isActionValid = false
 			break
 		}
@@ -49,7 +49,7 @@ func (s *Statement) isValid(allowList AllowList) bool {
 
 	isResourceValid := true
 	for _, resource := range s.Resources {
-		if !resource.isValid(allowList) {
+		if !resource.isValid(specification) {
 			isResourceValid = false
 			break
 		}
