@@ -24,10 +24,10 @@ func NewResource(object ResourceObject) Resource {
 // Example: NewObjectResource(ResourceObjectCredential, "123") returns "Credential:123".
 func NewObjectResource(object ResourceObject, suffix string) Resource {
 	if suffix == "" {
-		return Resource(string(object) + Separator + "*")
+		return Resource(string(object) + SeparatorChar + "*")
 	}
 
-	return Resource(string(object) + Separator + suffix)
+	return Resource(string(object) + SeparatorChar + suffix)
 }
 
 // String returns the underlying string value of the resource.
@@ -67,7 +67,7 @@ func (r Resource) isValid(specification Specification) bool {
 // Object returns the object part of the resource.
 // If the resource doesn't contain a colon, it returns the entire resource string.
 func (r Resource) Object() ResourceObject {
-	parts := strings.SplitN(r.String(), Separator, 2)
+	parts := strings.SplitN(r.String(), SeparatorChar, 2)
 	if len(parts) == 0 {
 		return ResourceObject("")
 	}
@@ -78,7 +78,7 @@ func (r Resource) Object() ResourceObject {
 // Suffix returns the suffix part of the resource (everything after the colon).
 // If the resource doesn't contain a colon, it returns an empty string.
 func (r Resource) Suffix() string {
-	parts := strings.SplitN(r.String(), Separator, 2)
+	parts := strings.SplitN(r.String(), SeparatorChar, 2)
 	if len(parts) < 2 {
 		return ""
 	}

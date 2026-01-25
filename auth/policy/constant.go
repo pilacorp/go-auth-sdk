@@ -54,5 +54,5 @@ const (
 
 // Predefined split character constants.
 const (
-	Separator string = ":"
+	SeparatorChar string = ":"
 )

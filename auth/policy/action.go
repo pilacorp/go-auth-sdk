@@ -25,7 +25,7 @@ func NewAction(value string) Action {
 // NewObjectAction constructs an Action from an object and a verb.
 // Example: NewObjectAction(ActionObjectIssuer, ActionVerbCreate) returns "Issuer:Create".
 func NewObjectAction(object ActionObject, verb ActionVerb) Action {
-	return Action(string(object) + Separator + string(verb))
+	return Action(string(object) + SeparatorChar + string(verb))
 }
 
 // String returns the underlying string value of the action.
@@ -36,7 +36,7 @@ func (a Action) String() string {
 // Object returns the object part of the action (everything before the colon).
 // Returns an empty string if the action doesn't contain a colon.
 func (a Action) Object() string {
-	parts := strings.SplitN(string(a), Separator, 2)
+	parts := strings.SplitN(string(a), SeparatorChar, 2)
 	if len(parts) != 2 {
 		return ""
 	}
@@ -47,7 +47,7 @@ func (a Action) Object() string {
 // Verb returns the verb part of the action (everything after the colon).
 // Returns an empty string if the action doesn't contain a colon.
 func (a Action) Verb() string {
-	parts := strings.SplitN(string(a), Separator, 2)
+	parts := strings.SplitN(string(a), SeparatorChar, 2)
 	if len(parts) != 2 {
 		return ""
 	}
