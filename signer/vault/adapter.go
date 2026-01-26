@@ -1,4 +1,4 @@
-// Package vault provides an implementation of the provider interface that uses Vault for signing.
+// Package vault provides an implementation of the signer interface that uses Vault for signing.
 package vault
 
 import (
@@ -7,7 +7,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/signer"
 )
 
-// vaultSigner is the provider implementation that uses Vault for signing.
+// vaultSigner is the signer implementation that uses Vault for signing.
 type vaultSigner struct {
 	vault *Vault
 }
