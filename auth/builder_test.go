@@ -57,9 +57,9 @@ func TestCredentialBuilder_Build(t *testing.T) {
 	// Build credential with all options
 	builder, err := NewCredentialBuilder(
 		BuilderConfig{
-			issuerDID: issuerDID,
-			schemaID:  schemaID,
-			signer:    ecdsaSigner,
+			IssuerDID: issuerDID,
+			SchemaID:  schemaID,
+			Signer:    ecdsaSigner,
 		},
 	)
 	if err != nil {
@@ -67,10 +67,10 @@ func TestCredentialBuilder_Build(t *testing.T) {
 	}
 
 	result, err := builder.Build(ctx, CredentialData{
-		holderDID:  holderDID,
-		policy:     testPolicy,
-		validFrom:  &validFrom,
-		validUntil: &validUntil,
+		HolderDID:  holderDID,
+		Policy:     testPolicy,
+		ValidFrom:  &validFrom,
+		ValidUntil: &validUntil,
 	}, signer.WithPrivateKey(privateKeyBytes))
 	if err != nil {
 		t.Fatalf("Build() unexpected error: %v", err)
@@ -79,8 +79,8 @@ func TestCredentialBuilder_Build(t *testing.T) {
 	if result == nil {
 		t.Fatal("Build() returned nil result")
 	}
-	if result.JWT == "" {
+	if result.token == "" {
 		t.Error("Build() JWT is empty")
 	}
-	t.Logf("Credential: %s", result.JWT)
+	t.Logf("Credential: %s", result.token)
 }

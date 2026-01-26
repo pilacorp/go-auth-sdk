@@ -15,22 +15,27 @@ import (
 
 // BuilderConfig holds the builder configuration.
 type BuilderConfig struct {
-	issuerDID string
-	schemaID  string
-	signer    signer.Signer
+	IssuerDID string
+	SchemaID  string
+	Signer    signer.Signer
 }
 
 // CredentialData holds the credential-specific data.
 type CredentialData struct {
-	holderDID  string
-	policy     policy.Policy
-	validFrom  *time.Time
-	validUntil *time.Time
+	HolderDID  string
+	Policy     policy.Policy
+	ValidFrom  *time.Time
+	ValidUntil *time.Time
 }
 
 // CredentialBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
 type CredentialBuilder struct {
-	config BuilderConfig
+	Config BuilderConfig
+}
+
+// BuildResult represents the result of building a credential.
+type BuildResult struct {
+	token string
 }
 
 // NewCredentialBuilder creates a new reusable CredentialBuilder.
@@ -40,13 +45,8 @@ func NewCredentialBuilder(config BuilderConfig) (*CredentialBuilder, error) {
 	}
 
 	return &CredentialBuilder{
-		config: config,
+		Config: config,
 	}, nil
-}
-
-// BuildResult represents the result of building a credential.
-type BuildResult struct {
-	JWT string
 }
 
 // Build creates the VC-JWT payload and optionally signs it if a signer is available.
@@ -54,10 +54,10 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 	// Build credential subject with permissions
 	// vc.Subject has ID and CustomFields
 	customFields := make(map[string]any)
-	customFields["permissions"] = data.policy.Permissions
+	customFields["permissions"] = data.Policy.Permissions
 
 	subject := vc.Subject{
-		ID:           data.holderDID,
+		ID:           data.HolderDID,
 		CustomFields: customFields,
 	}
 
@@ -71,21 +71,21 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 		},
 		Schemas: []vc.Schema{
 			{
-				ID:   b.config.schemaID,
+				ID:   b.Config.SchemaID,
 				Type: "JsonSchema",
 			},
 		},
-		Issuer:  b.config.issuerDID,
+		Issuer:  b.Config.IssuerDID,
 		Types:   []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject: subjects,
 	}
 
 	// Add validity period if provided
-	if data.validFrom != nil {
-		vcContents.ValidFrom = *data.validFrom
+	if data.ValidFrom != nil {
+		vcContents.ValidFrom = *data.ValidFrom
 	}
-	if data.validUntil != nil {
-		vcContents.ValidUntil = *data.validUntil
+	if data.ValidUntil != nil {
+		vcContents.ValidUntil = *data.ValidUntil
 	}
 
 	// Create JWT credential
@@ -105,7 +105,7 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 	hash := sha256.Sum256(signData)
 
 	// Sign the credential
-	signature, err := b.config.signer.Sign(ctx, hash[:], opts...)
+	signature, err := b.Config.Signer.Sign(ctx, hash[:], opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign credential: %w", err)
 	}
@@ -130,19 +130,19 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 	}
 
 	return &BuildResult{
-		JWT: string(documentBytes),
+		token: string(documentBytes),
 	}, nil
 }
 
 // validate validates the credential configuration.
 func (c *BuilderConfig) validate() error {
-	if c.issuerDID == "" {
+	if c.IssuerDID == "" {
 		return fmt.Errorf("issuer DID is required")
 	}
-	if c.schemaID == "" {
+	if c.SchemaID == "" {
 		return fmt.Errorf("schema ID is required")
 	}
-	if c.signer == nil {
+	if c.Signer == nil {
 		return fmt.Errorf("signer is required")
 	}
 	return nil
