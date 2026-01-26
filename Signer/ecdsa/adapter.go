@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	signer "github.com/pilacorp/go-auth-sdk/signer"
+	"github.com/pilacorp/go-auth-sdk/signer"
 )
 
 // privSigner is the provider implementation that uses a private key for signing.
