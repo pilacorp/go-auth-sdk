@@ -90,22 +90,6 @@ func WithExpiration(validFrom, validUntil time.Time) CredentialOption {
 	}
 }
 
-// CredentialPayload represents the VC payload structure.
-type CredentialPayload struct {
-	Issuer            string            `json:"iss"`
-	Subject           string            `json:"sub"`
-	SchemaID          string            `json:"schemaId,omitempty"`
-	ValidFrom         *time.Time        `json:"validFrom,omitempty"`
-	ValidUntil        *time.Time        `json:"validUntil,omitempty"`
-	CredentialSubject CredentialSubject `json:"credentialSubject"`
-}
-
-// CredentialSubject represents the credential subject with embedded permissions.
-type CredentialSubject struct {
-	ID          string             `json:"id"`
-	Permissions []policy.Statement `json:"permissions"`
-}
-
 // BuildResult represents the result of building a credential.
 type BuildResult struct {
 	JWT string
@@ -149,7 +133,7 @@ func (b *CredentialBuilder) Build(ctx context.Context, opts ...signer.SignOption
 			},
 		},
 		Issuer:  b.options.issuerDID,
-		Types:   []string{"VerifiableCredential"},
+		Types:   []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject: subjects,
 	}
 
