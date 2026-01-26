@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
-	"github.com/pilacorp/go-auth-sdk/provider"
+	"github.com/pilacorp/go-auth-sdk/signer"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
@@ -18,7 +18,7 @@ type CredentialOption func(*credentialOptions)
 
 // credentialOptions holds all the options for building a credential.
 type credentialOptions struct {
-	provider   provider.Provider
+	signer     signer.Signer
 	issuerDID  string
 	holderDID  string
 	schemaID   string
@@ -47,10 +47,10 @@ func NewCredentialBuilder(opts ...CredentialOption) *CredentialBuilder {
 	}
 }
 
-// WithProvider sets the signing provider for the credential.
-func WithProvider(p provider.Provider) CredentialOption {
+// WithSigner sets the signing signer for the credential.
+func WithSigner(s signer.Signer) CredentialOption {
 	return func(o *credentialOptions) {
-		o.provider = p
+		o.signer = s
 	}
 }
 
@@ -111,8 +111,8 @@ type BuildResult struct {
 	JWT string
 }
 
-// Build creates the VC-JWT payload and optionally signs it if a provider is available.
-func (b *CredentialBuilder) Build(ctx context.Context, opts ...provider.SignOption) (*BuildResult, error) {
+// Build creates the VC-JWT payload and optionally signs it if a signer is available.
+func (b *CredentialBuilder) Build(ctx context.Context, opts ...signer.SignOption) (*BuildResult, error) {
 	// Validate required fields
 	if b.options.issuerDID == "" {
 		return nil, fmt.Errorf("issuer DID is required")
@@ -167,8 +167,8 @@ func (b *CredentialBuilder) Build(ctx context.Context, opts ...provider.SignOpti
 		return nil, fmt.Errorf("failed to create JWT credential: %w", err)
 	}
 
-	// If provider is available, sign the credential
-	if b.options.provider != nil {
+	// If signer is available, sign the credential
+	if b.options.signer != nil {
 		// Get signing input
 		signData, err := vcCredential.GetSigningInput()
 		if err != nil {
@@ -178,8 +178,8 @@ func (b *CredentialBuilder) Build(ctx context.Context, opts ...provider.SignOpti
 		// Hash the signing data
 		hash := sha256.Sum256(signData)
 
-		// Sign using the provider
-		signature, err := b.options.provider.Sign(ctx, hash[:], opts...)
+		// Sign using the signer
+		signature, err := b.options.signer.Sign(ctx, hash[:], opts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign credential: %w", err)
 		}

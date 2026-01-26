@@ -4,7 +4,7 @@ package vault
 import (
 	"context"
 
-	signer "github.com/pilacorp/go-auth-sdk/Signer"
+	signer "github.com/pilacorp/go-auth-sdk/signer"
 )
 
 // vaultSigner is the provider implementation that uses Vault for signing.
