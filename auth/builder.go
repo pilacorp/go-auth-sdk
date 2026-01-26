@@ -13,81 +13,35 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-// CredentialOption configures a CredentialBuilder during construction.
-type CredentialOption func(*credentialOptions)
+// BuilderConfig holds the builder configuration.
+type BuilderConfig struct {
+	issuerDID string
+	schemaID  string
+	signer    signer.Signer
+}
 
-// credentialOptions holds all the options for building a credential.
-type credentialOptions struct {
-	signer     signer.Signer
-	issuerDID  string
+// CredentialData holds the credential-specific data.
+type CredentialData struct {
 	holderDID  string
-	schemaID   string
+	policy     policy.Policy
 	validFrom  *time.Time
 	validUntil *time.Time
-	policy     *policy.Policy
 }
 
 // CredentialBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
 type CredentialBuilder struct {
-	options credentialOptions
+	config BuilderConfig
 }
 
-// NewCredentialBuilder creates a new CredentialBuilder with the given options.
-func NewCredentialBuilder(opts ...CredentialOption) *CredentialBuilder {
-	options := credentialOptions{
-		policy: &policy.Policy{},
+// NewCredentialBuilder creates a new reusable CredentialBuilder.
+func NewCredentialBuilder(config BuilderConfig) (*CredentialBuilder, error) {
+	if err := config.validate(); err != nil {
+		return nil, fmt.Errorf("invalid builder config: %w", err)
 	}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&options)
-		}
-	}
+
 	return &CredentialBuilder{
-		options: options,
-	}
-}
-
-// WithSigner sets the signing signer for the credential.
-func WithSigner(s signer.Signer) CredentialOption {
-	return func(o *credentialOptions) {
-		o.signer = s
-	}
-}
-
-// WithIssuer sets the issuer DID.
-func WithIssuer(issuerDID string) CredentialOption {
-	return func(o *credentialOptions) {
-		o.issuerDID = issuerDID
-	}
-}
-
-// WithHolder sets the holder DID (subject).
-func WithHolder(holderDID string) CredentialOption {
-	return func(o *credentialOptions) {
-		o.holderDID = holderDID
-	}
-}
-
-// WithSchemaID sets the schema ID for the credential.
-func WithSchemaID(schemaID string) CredentialOption {
-	return func(o *credentialOptions) {
-		o.schemaID = schemaID
-	}
-}
-
-// WithPolicy sets the policy for the credential.
-func WithPolicy(p policy.Policy) CredentialOption {
-	return func(o *credentialOptions) {
-		o.policy = &p
-	}
-}
-
-// WithExpiration sets the validity period for the credential.
-func WithExpiration(validFrom, validUntil time.Time) CredentialOption {
-	return func(o *credentialOptions) {
-		o.validFrom = &validFrom
-		o.validUntil = &validUntil
-	}
+		config: config,
+	}, nil
 }
 
 // BuildResult represents the result of building a credential.
@@ -96,25 +50,14 @@ type BuildResult struct {
 }
 
 // Build creates the VC-JWT payload and optionally signs it if a signer is available.
-func (b *CredentialBuilder) Build(ctx context.Context, opts ...signer.SignOption) (*BuildResult, error) {
-	// Validate required fields
-	if b.options.issuerDID == "" {
-		return nil, fmt.Errorf("issuer DID is required")
-	}
-	if b.options.holderDID == "" {
-		return nil, fmt.Errorf("holder DID is required")
-	}
-	if b.options.policy == nil || b.options.policy.IsEmpty() {
-		return nil, fmt.Errorf("policy with at least one statement is required")
-	}
-
+func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts ...signer.SignOption) (*BuildResult, error) {
 	// Build credential subject with permissions
 	// vc.Subject has ID and CustomFields
 	customFields := make(map[string]any)
-	customFields["permissions"] = b.options.policy.Permissions
+	customFields["permissions"] = data.policy.Permissions
 
 	subject := vc.Subject{
-		ID:           b.options.holderDID,
+		ID:           data.holderDID,
 		CustomFields: customFields,
 	}
 
@@ -128,21 +71,21 @@ func (b *CredentialBuilder) Build(ctx context.Context, opts ...signer.SignOption
 		},
 		Schemas: []vc.Schema{
 			{
-				ID:   b.options.schemaID,
+				ID:   b.config.schemaID,
 				Type: "JsonSchema",
 			},
 		},
-		Issuer:  b.options.issuerDID,
+		Issuer:  b.config.issuerDID,
 		Types:   []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject: subjects,
 	}
 
 	// Add validity period if provided
-	if b.options.validFrom != nil {
-		vcContents.ValidFrom = *b.options.validFrom
+	if data.validFrom != nil {
+		vcContents.ValidFrom = *data.validFrom
 	}
-	if b.options.validUntil != nil {
-		vcContents.ValidUntil = *b.options.validUntil
+	if data.validUntil != nil {
+		vcContents.ValidUntil = *data.validUntil
 	}
 
 	// Create JWT credential
@@ -151,30 +94,28 @@ func (b *CredentialBuilder) Build(ctx context.Context, opts ...signer.SignOption
 		return nil, fmt.Errorf("failed to create JWT credential: %w", err)
 	}
 
-	// If signer is available, sign the credential
-	if b.options.signer != nil {
-		// Get signing input
-		signData, err := vcCredential.GetSigningInput()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get signing input: %w", err)
-		}
+	// Sign the credential
+	// Get signing input
+	signData, err := vcCredential.GetSigningInput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing input: %w", err)
+	}
 
-		// Hash the signing data
-		hash := sha256.Sum256(signData)
+	// Hash the signing data
+	hash := sha256.Sum256(signData)
 
-		// Sign using the signer
-		signature, err := b.options.signer.Sign(ctx, hash[:], opts...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign credential: %w", err)
-		}
+	// Sign the credential
+	signature, err := b.config.signer.Sign(ctx, hash[:], opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign credential: %w", err)
+	}
 
-		// Add proof with signature
-		err = vcCredential.AddCustomProof(&vcdto.Proof{
-			Signature: signature,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to add proof: %w", err)
-		}
+	// Add proof with signature
+	err = vcCredential.AddCustomProof(&vcdto.Proof{
+		Signature: signature,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add proof: %w", err)
 	}
 
 	// Serialize the credential to JWT string
@@ -191,4 +132,18 @@ func (b *CredentialBuilder) Build(ctx context.Context, opts ...signer.SignOption
 	return &BuildResult{
 		JWT: string(documentBytes),
 	}, nil
+}
+
+// validate validates the credential configuration.
+func (c *BuilderConfig) validate() error {
+	if c.issuerDID == "" {
+		return fmt.Errorf("issuer DID is required")
+	}
+	if c.schemaID == "" {
+		return fmt.Errorf("schema ID is required")
+	}
+	if c.signer == nil {
+		return fmt.Errorf("signer is required")
+	}
+	return nil
 }
