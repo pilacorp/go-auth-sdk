@@ -2,14 +2,13 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
-	"github.com/pilacorp/go-auth-sdk/provider"
-	"github.com/pilacorp/go-auth-sdk/provider/ecdsa"
+	"github.com/pilacorp/go-auth-sdk/signer"
+	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 )
 
 func TestCredentialBuilder_Build(t *testing.T) {
@@ -24,7 +23,7 @@ func TestCredentialBuilder_Build(t *testing.T) {
 	privateKeyBytes := crypto.FromECDSA(privateKey)
 
 	// Create ECDSA provider
-	ecdsaProvider := ecdsa.NewProviderPriv()
+	ecdsaSigner := ecdsa.NewPrivSigner()
 
 	// Create comprehensive policy with multiple statements and conditions
 	actions1 := []policy.Action{
@@ -57,7 +56,7 @@ func TestCredentialBuilder_Build(t *testing.T) {
 
 	// Build credential with all options
 	builder := NewCredentialBuilder(
-		WithProvider(ecdsaProvider),
+		WithSigner(ecdsaSigner),
 		WithIssuer(issuerDID),
 		WithHolder(holderDID),
 		WithPolicy(testPolicy),
@@ -65,7 +64,7 @@ func TestCredentialBuilder_Build(t *testing.T) {
 		WithExpiration(validFrom, validUntil),
 	)
 
-	result, err := builder.Build(ctx, provider.WithPrivateKey(privateKeyBytes))
+	result, err := builder.Build(ctx, signer.WithPrivateKey(privateKeyBytes))
 	if err != nil {
 		t.Fatalf("Build() unexpected error: %v", err)
 	}
@@ -76,5 +75,4 @@ func TestCredentialBuilder_Build(t *testing.T) {
 	if result.JWT == "" {
 		t.Error("Build() JWT is empty")
 	}
-	fmt.Println(result.JWT)
 }

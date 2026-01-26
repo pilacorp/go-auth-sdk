@@ -1,4 +1,4 @@
-// Package vault provides an implementation of the provider interface that uses Vault for signing.
+// Package vault provides an implementation of the signer interface that uses Vault for signing.
 package vault
 
 import (
