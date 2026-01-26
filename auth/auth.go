@@ -9,16 +9,10 @@ import (
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-auth-sdk/signer"
+	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
-
-// BuilderConfig holds the builder configuration.
-type BuilderConfig struct {
-	IssuerDID string
-	SchemaID  string
-	Signer    signer.Signer
-}
 
 // CredentialData holds the credential-specific data.
 type CredentialData struct {
@@ -30,27 +24,42 @@ type CredentialData struct {
 
 // CredentialBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
 type CredentialBuilder struct {
-	Config BuilderConfig
+	IssuerDID string
+	SchemaID  string
+	Signer    signer.Signer
 }
 
-// BuildResult represents the result of building a credential.
-type BuildResult struct {
-	token string
+// CredentialResult represents the result of building a credential.
+type CredentialResult struct {
+	Token string
 }
 
 // NewCredentialBuilder creates a new reusable CredentialBuilder.
-func NewCredentialBuilder(config BuilderConfig) (*CredentialBuilder, error) {
-	if err := config.validate(); err != nil {
-		return nil, fmt.Errorf("invalid builder config: %w", err)
+func NewCredentialBuilder(issuerDID, schemaID string, signer signer.Signer) (*CredentialBuilder, error) {
+	if issuerDID == "" {
+		return nil, fmt.Errorf("issuer DID is required")
+	}
+	if schemaID == "" {
+		return nil, fmt.Errorf("schema ID is required")
+	}
+	if signer == nil {
+		signer = ecdsa.NewPrivSigner()
 	}
 
 	return &CredentialBuilder{
-		Config: config,
+		IssuerDID: issuerDID,
+		SchemaID:  schemaID,
+		Signer:    signer,
 	}, nil
 }
 
 // Build creates the VC-JWT payload and optionally signs it if a signer is available.
-func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts ...signer.SignOption) (*BuildResult, error) {
+func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts ...signer.SignOption) (*CredentialResult, error) {
+	// Holder DID is required
+	if data.HolderDID == "" {
+		return nil, fmt.Errorf("holder DID is required")
+	}
+
 	// Build credential subject with permissions
 	// vc.Subject has ID and CustomFields
 	customFields := make(map[string]any)
@@ -61,7 +70,7 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 		CustomFields: customFields,
 	}
 
-	// Build credential contents for go-credential-sdk
+	// Build credential contents
 	subjects := []vc.Subject{subject}
 
 	vcContents := vc.CredentialContents{
@@ -71,11 +80,11 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 		},
 		Schemas: []vc.Schema{
 			{
-				ID:   b.Config.SchemaID,
+				ID:   b.SchemaID,
 				Type: "JsonSchema",
 			},
 		},
-		Issuer:  b.Config.IssuerDID,
+		Issuer:  b.IssuerDID,
 		Types:   []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject: subjects,
 	}
@@ -105,7 +114,7 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 	hash := sha256.Sum256(signData)
 
 	// Sign the credential
-	signature, err := b.Config.Signer.Sign(ctx, hash[:], opts...)
+	signature, err := b.Signer.Sign(ctx, hash[:], opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign credential: %w", err)
 	}
@@ -129,21 +138,7 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 		return nil, fmt.Errorf("failed to marshal document: %w", err)
 	}
 
-	return &BuildResult{
-		token: string(documentBytes),
+	return &CredentialResult{
+		Token: string(documentBytes),
 	}, nil
-}
-
-// validate validates the credential configuration.
-func (c *BuilderConfig) validate() error {
-	if c.IssuerDID == "" {
-		return fmt.Errorf("issuer DID is required")
-	}
-	if c.SchemaID == "" {
-		return fmt.Errorf("schema ID is required")
-	}
-	if c.Signer == nil {
-		return fmt.Errorf("signer is required")
-	}
-	return nil
 }
