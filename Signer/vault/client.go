@@ -13,8 +13,6 @@ import (
 
 // Constants for HTTP settings
 const (
-	contentTypeJSON   = "application/json"
-	acceptHeader      = "*/*"
 	defaultTimeout    = 10 * time.Second
 	defaultMaxRetries = 3
 )
@@ -38,23 +36,10 @@ func NewVault(address, token string, maxRetries ...int) *Vault {
 		Address:    address,
 		Token:      token,
 		MaxRetries: retries,
-		httpClient: newHTTPClient(),
+		httpClient: &http.Client{
+			Timeout: defaultTimeout,
+		},
 	}
-}
-
-func newHTTPClient() *http.Client {
-	return &http.Client{
-		Timeout: defaultTimeout,
-	}
-}
-
-// applyCommonHeaders applies common HTTP headers to the request
-func (v *Vault) applyCommonHeaders(req *http.Request, bodyLen int) {
-	req.Header.Set("Content-Type", contentTypeJSON)
-	req.Header.Set("X-Vault-Token", v.Token)
-	req.Header.Set("Accept", acceptHeader)
-	req.Header.Set("Host", v.Address)
-	req.Header.Set("Content-Length", fmt.Sprintf("%d", bodyLen))
 }
 
 // decodeHexSignature safely decodes a hex string signature, handling the "0x" prefix
@@ -118,7 +103,11 @@ func (v *Vault) SignMessage(ctx context.Context, payload []byte, address string)
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		v.applyCommonHeaders(req, len(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Vault-Token", v.Token)
+		req.Header.Set("Accept", "*/*")
+		req.Header.Set("Host", v.Address)
+		req.Header.Set("Content-Length", fmt.Sprintf("%d", len(jsonBody)))
 
 		resp, err := v.httpClient.Do(req)
 		if err != nil {

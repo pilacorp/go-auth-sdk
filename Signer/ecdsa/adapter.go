@@ -6,20 +6,20 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pilacorp/go-auth-sdk/provider"
+	signer "github.com/pilacorp/go-auth-sdk/signer"
 )
 
-// ProviderPriv is the provider implementation that uses a private key for signing.
-type ProviderPriv struct{}
+// privSigner is the provider implementation that uses a private key for signing.
+type privSigner struct{}
 
-// NewProviderPriv creates a new ProviderPriv instance.
-func NewProviderPriv() provider.Provider {
-	return &ProviderPriv{}
+// NewPrivSigner creates a new privSigner instance.
+func NewPrivSigner() signer.Signer {
+	return &privSigner{}
 }
 
 // Sign signs the payload using the private key
-func (p *ProviderPriv) Sign(ctx context.Context, payload []byte, opts ...provider.SignOption) ([]byte, error) {
-	options := &provider.SignOptions{}
+func (p *privSigner) Sign(ctx context.Context, payload []byte, opts ...signer.SignOption) ([]byte, error) {
+	options := &signer.SignOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}

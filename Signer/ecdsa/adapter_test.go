@@ -5,17 +5,17 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pilacorp/go-auth-sdk/provider"
+	"github.com/pilacorp/go-auth-sdk/signer"
 )
 
 func TestNewProviderPriv(t *testing.T) {
-	p := NewProviderPriv()
+	p := NewPrivSigner()
 	if p == nil {
-		t.Fatal("NewProviderPriv() returned nil")
+		t.Fatal("NewPrivSigner() returned nil")
 	}
 
 	// Verify it implements the Provider interface
-	var _ provider.Provider = p
+	var _ signer.Signer = p
 }
 
 func TestProviderPriv_Sign(t *testing.T) {
@@ -34,38 +34,38 @@ func TestProviderPriv_Sign(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload []byte
-		opts    []provider.SignOption
+		opts    []signer.SignOption
 		wantErr bool
 	}{
 		{
 			name:    "successful sign with valid private key",
 			payload: payload,
-			opts:    []provider.SignOption{provider.WithPrivateKey(privateKeyBytes)},
+			opts:    []signer.SignOption{signer.WithPrivateKey(privateKeyBytes)},
 			wantErr: false,
 		},
 		{
 			name:    "error with invalid private key",
 			payload: payload,
-			opts:    []provider.SignOption{provider.WithPrivateKey([]byte("invalid key"))},
+			opts:    []signer.SignOption{signer.WithPrivateKey([]byte("invalid key"))},
 			wantErr: true,
 		},
 		{
 			name:    "error with missing private key",
 			payload: payload,
-			opts:    []provider.SignOption{},
+			opts:    []signer.SignOption{},
 			wantErr: true,
 		},
 		{
 			name:    "error with non-32-byte payload",
 			payload: []byte("short payload"),
-			opts:    []provider.SignOption{provider.WithPrivateKey(privateKeyBytes)},
+			opts:    []signer.SignOption{signer.WithPrivateKey(privateKeyBytes)},
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewProviderPriv()
+			p := NewPrivSigner()
 			ctx := context.Background()
 
 			sig, err := p.Sign(ctx, tt.payload, tt.opts...)

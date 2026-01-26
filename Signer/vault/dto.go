@@ -1,5 +1,6 @@
 package vault
 
+// SignMessageRequest represents the Vault API request for signing a message
 type SignMessageRequest struct {
 	Payload string `json:"payload"`
 }

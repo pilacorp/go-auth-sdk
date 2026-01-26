@@ -1,6 +1,6 @@
-// Package provider provides a provider interface for signing operations.
+// Package signer provides a signer interface for signing operations.
 // It supports both local private key and Vault signers.
-package provider
+package signer
 
 import "context"
 
@@ -12,6 +12,12 @@ type SignOptions struct {
 }
 
 type SignOption func(*SignOptions)
+
+// Signer defines the signing capability used by the auth service.
+// Sign should take an arbitrary payload and return the signed token bytes.
+type Signer interface {
+	Sign(ctx context.Context, payload []byte, opts ...SignOption) ([]byte, error)
+}
 
 // WithSignerAddress sets the signer address for the signing operation.
 func WithSignerAddress(address string) SignOption {
@@ -32,10 +38,4 @@ func WithPrivateKey(privateKey []byte) SignOption {
 	return func(o *SignOptions) {
 		o.PrivateKey = privateKey
 	}
-}
-
-// Provider defines the signing capability used by the auth service.
-// Sign should take an arbitrary payload and return the signed token bytes.
-type Provider interface {
-	Sign(ctx context.Context, payload []byte, opts ...SignOption) ([]byte, error)
 }
