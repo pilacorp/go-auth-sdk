@@ -16,7 +16,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/signer/vault"
 )
 
-func TestCredentialBuilder_Build(t *testing.T) {
+func TestAuthBuilder_Build(t *testing.T) {
 	ctx := context.Background()
 
 	// Generate a private key for testing
@@ -60,7 +60,7 @@ func TestCredentialBuilder_Build(t *testing.T) {
 	holderDID := "did:example:holder"
 
 	// Build credential with all options
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		issuerDID,
 		schemaID,
 		ecdsaSigner,
@@ -69,7 +69,7 @@ func TestCredentialBuilder_Build(t *testing.T) {
 		t.Fatalf("Failed to create credential builder: %v", err)
 	}
 
-	result, err := builder.Build(ctx, CredentialData{
+	result, err := builder.Build(ctx, AuthData{
 		HolderDID:  holderDID,
 		Policy:     testPolicy,
 		ValidFrom:  &validFrom,
@@ -88,48 +88,48 @@ func TestCredentialBuilder_Build(t *testing.T) {
 	t.Logf("Credential: %s", result.Token)
 }
 
-func TestNewCredentialBuilder_EmptyIssuerDID(t *testing.T) {
+func TestNewAuthBuilder_EmptyIssuerDID(t *testing.T) {
 	ecdsaSigner := ecdsa.NewPrivSigner()
-	_, err := NewCredentialBuilder("", "https://example.com/schema/v1", ecdsaSigner)
+	_, err := NewAuthBuilder("", "https://example.com/schema/v1", ecdsaSigner)
 	if err == nil {
-		t.Error("NewCredentialBuilder() should return error for empty issuerDID")
+		t.Error("NewAuthBuilder() should return error for empty issuerDID")
 	}
 	if err.Error() != "issuer DID is required" {
-		t.Errorf("NewCredentialBuilder() error = %v, want 'issuer DID is required'", err)
+		t.Errorf("NewAuthBuilder() error = %v, want 'issuer DID is required'", err)
 	}
 }
 
-func TestNewCredentialBuilder_EmptySchemaID(t *testing.T) {
+func TestNewAuthBuilder_EmptySchemaID(t *testing.T) {
 	ecdsaSigner := ecdsa.NewPrivSigner()
-	_, err := NewCredentialBuilder("did:example:issuer", "", ecdsaSigner)
+	_, err := NewAuthBuilder("did:example:issuer", "", ecdsaSigner)
 	if err == nil {
-		t.Error("NewCredentialBuilder() should return error for empty schemaID")
+		t.Error("NewAuthBuilder() should return error for empty schemaID")
 	}
 	if err.Error() != "schema ID is required" {
-		t.Errorf("NewCredentialBuilder() error = %v, want 'schema ID is required'", err)
+		t.Errorf("NewAuthBuilder() error = %v, want 'schema ID is required'", err)
 	}
 }
 
-func TestNewCredentialBuilder_NilSigner(t *testing.T) {
-	builder, err := NewCredentialBuilder("did:example:issuer", "https://example.com/schema/v1", nil)
+func TestNewAuthBuilder_NilSigner(t *testing.T) {
+	builder, err := NewAuthBuilder("did:example:issuer", "https://example.com/schema/v1", nil)
 	if err != nil {
-		t.Fatalf("NewCredentialBuilder() with nil signer should use default: %v", err)
+		t.Fatalf("NewAuthBuilder() with nil signer should use default: %v", err)
 	}
 	if builder == nil {
-		t.Fatal("NewCredentialBuilder() should return builder when signer is nil")
+		t.Fatal("NewAuthBuilder() should return builder when signer is nil")
 	}
 	if builder.Signer == nil {
-		t.Error("NewCredentialBuilder() should set default signer when nil is provided")
+		t.Error("NewAuthBuilder() should set default signer when nil is provided")
 	}
 }
 
-func TestCredentialBuilder_Build_EmptyPolicy(t *testing.T) {
+func TestAuthBuilder_Build_EmptyPolicy(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
 	ecdsaSigner := ecdsa.NewPrivSigner()
 
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		"did:example:issuer",
 		"https://example.com/schema/v1",
 		ecdsaSigner,
@@ -139,7 +139,7 @@ func TestCredentialBuilder_Build_EmptyPolicy(t *testing.T) {
 	}
 
 	emptyPolicy := policy.NewPolicy()
-	result, err := builder.Build(ctx, CredentialData{
+	result, err := builder.Build(ctx, AuthData{
 		HolderDID: "did:example:holder",
 		Policy:    emptyPolicy,
 	}, signer.WithPrivateKey(privateKeyBytes))
@@ -155,7 +155,7 @@ func TestCredentialBuilder_Build_EmptyPolicy(t *testing.T) {
 	}
 }
 
-func TestCredentialBuilder_Build_WithoutValidityPeriod(t *testing.T) {
+func TestAuthBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
@@ -172,7 +172,7 @@ func TestCredentialBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 		),
 	)
 
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		"did:example:issuer",
 		"https://example.com/schema/v1",
 		ecdsaSigner,
@@ -181,7 +181,7 @@ func TestCredentialBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 		t.Fatalf("Failed to create builder: %v", err)
 	}
 
-	result, err := builder.Build(ctx, CredentialData{
+	result, err := builder.Build(ctx, AuthData{
 		HolderDID: "did:example:holder",
 		Policy:    testPolicy,
 		// ValidFrom and ValidUntil are nil
@@ -198,7 +198,7 @@ func TestCredentialBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 	}
 }
 
-func TestCredentialBuilder_Build_OnlyValidFrom(t *testing.T) {
+func TestAuthBuilder_Build_OnlyValidFrom(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
@@ -216,7 +216,7 @@ func TestCredentialBuilder_Build_OnlyValidFrom(t *testing.T) {
 		),
 	)
 
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		"did:example:issuer",
 		"https://example.com/schema/v1",
 		ecdsaSigner,
@@ -225,7 +225,7 @@ func TestCredentialBuilder_Build_OnlyValidFrom(t *testing.T) {
 		t.Fatalf("Failed to create builder: %v", err)
 	}
 
-	result, err := builder.Build(ctx, CredentialData{
+	result, err := builder.Build(ctx, AuthData{
 		HolderDID: "did:example:holder",
 		Policy:    testPolicy,
 		ValidFrom: &validFrom,
@@ -240,14 +240,14 @@ func TestCredentialBuilder_Build_OnlyValidFrom(t *testing.T) {
 	}
 }
 
-func TestCredentialBuilder_Build_MultipleCredentials(t *testing.T) {
+func TestAuthBuilder_Build_MultipleCredentials(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
 	ecdsaSigner := ecdsa.NewPrivSigner()
 
 	// Create builder once
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		"did:example:issuer",
 		"https://example.com/schema/v1",
 		ecdsaSigner,
@@ -270,7 +270,7 @@ func TestCredentialBuilder_Build_MultipleCredentials(t *testing.T) {
 			),
 		)
 
-		result, err := builder.Build(ctx, CredentialData{
+		result, err := builder.Build(ctx, AuthData{
 			HolderDID: holderDID,
 			Policy:    testPolicy,
 		}, signer.WithPrivateKey(privateKeyBytes))
@@ -287,7 +287,7 @@ func TestCredentialBuilder_Build_MultipleCredentials(t *testing.T) {
 	}
 }
 
-func TestCredentialBuilder_Build_InvalidPrivateKey(t *testing.T) {
+func TestAuthBuilder_Build_InvalidPrivateKey(t *testing.T) {
 	ctx := context.Background()
 	ecdsaSigner := ecdsa.NewPrivSigner()
 
@@ -302,7 +302,7 @@ func TestCredentialBuilder_Build_InvalidPrivateKey(t *testing.T) {
 		),
 	)
 
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		"did:example:issuer",
 		"https://example.com/schema/v1",
 		ecdsaSigner,
@@ -313,7 +313,7 @@ func TestCredentialBuilder_Build_InvalidPrivateKey(t *testing.T) {
 
 	// Use invalid private key (too short)
 	invalidKey := []byte{1, 2, 3}
-	result, err := builder.Build(ctx, CredentialData{
+	result, err := builder.Build(ctx, AuthData{
 		HolderDID: "did:example:holder",
 		Policy:    testPolicy,
 	}, signer.WithPrivateKey(invalidKey))
@@ -327,7 +327,7 @@ func TestCredentialBuilder_Build_InvalidPrivateKey(t *testing.T) {
 	}
 }
 
-func TestCredentialBuilder_Build_EmptyHolderDID(t *testing.T) {
+func TestAuthBuilder_Build_EmptyHolderDID(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
@@ -344,7 +344,7 @@ func TestCredentialBuilder_Build_EmptyHolderDID(t *testing.T) {
 		),
 	)
 
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		"did:example:issuer",
 		"https://example.com/schema/v1",
 		ecdsaSigner,
@@ -353,7 +353,7 @@ func TestCredentialBuilder_Build_EmptyHolderDID(t *testing.T) {
 		t.Fatalf("Failed to create builder: %v", err)
 	}
 
-	result, err := builder.Build(ctx, CredentialData{
+	result, err := builder.Build(ctx, AuthData{
 		HolderDID: "", // Empty holder DID
 		Policy:    testPolicy,
 	}, signer.WithPrivateKey(privateKeyBytes))
@@ -370,7 +370,7 @@ func TestCredentialBuilder_Build_EmptyHolderDID(t *testing.T) {
 	}
 }
 
-func TestCredentialBuilder_Build_WithVaultSigner(t *testing.T) {
+func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test policy
@@ -436,7 +436,7 @@ func TestCredentialBuilder_Build_WithVaultSigner(t *testing.T) {
 	vaultSigner := vault.NewVaultSigner(server.URL, "test-vault-token")
 
 	// Create builder with Vault signer
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		"did:example:issuer",
 		"https://example.com/schema/v1",
 		vaultSigner,
@@ -449,7 +449,7 @@ func TestCredentialBuilder_Build_WithVaultSigner(t *testing.T) {
 	validUntil := time.Now().Add(24 * time.Hour)
 
 	// Build credential with Vault signer
-	result, err := builder.Build(ctx, CredentialData{
+	result, err := builder.Build(ctx, AuthData{
 		HolderDID:  "did:example:holder",
 		Policy:     testPolicy,
 		ValidFrom:  &validFrom,
@@ -468,7 +468,7 @@ func TestCredentialBuilder_Build_WithVaultSigner(t *testing.T) {
 	t.Logf("Credential with Vault signer: %s", result.Token)
 }
 
-func TestCredentialBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
+func TestAuthBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
 	ctx := context.Background()
 
 	testPolicy := policy.NewPolicy(
@@ -490,7 +490,7 @@ func TestCredentialBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
 
 	vaultSigner := vault.NewVaultSigner(server.URL, "test-vault-token")
 
-	builder, err := NewCredentialBuilder(
+	builder, err := NewAuthBuilder(
 		"did:example:issuer",
 		"https://example.com/schema/v1",
 		vaultSigner,
@@ -500,7 +500,7 @@ func TestCredentialBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
 	}
 
 	// Build without signer address - should fail
-	result, err := builder.Build(ctx, CredentialData{
+	result, err := builder.Build(ctx, AuthData{
 		HolderDID: "did:example:holder",
 		Policy:    testPolicy,
 	})

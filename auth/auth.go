@@ -5,48 +5,35 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-// CredentialData holds the credential-specific data.
-type CredentialData struct {
-	HolderDID  string
-	Policy     policy.Policy
-	ValidFrom  *time.Time
-	ValidUntil *time.Time
-}
-
-// CredentialBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
-type CredentialBuilder struct {
+// AuthBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
+type AuthBuilder struct {
 	IssuerDID string
 	SchemaID  string
 	Signer    signer.Signer
 }
 
-// CredentialResult represents the result of building a credential.
-type CredentialResult struct {
-	Token string
-}
-
-// NewCredentialBuilder creates a new reusable CredentialBuilder.
-func NewCredentialBuilder(issuerDID, schemaID string, signer signer.Signer) (*CredentialBuilder, error) {
+// NewAuthBuilder creates a new reusable AuthBuilder.
+func NewAuthBuilder(issuerDID, schemaID string, signer signer.Signer) (*AuthBuilder, error) {
 	if issuerDID == "" {
 		return nil, fmt.Errorf("issuer DID is required")
 	}
 	if schemaID == "" {
 		return nil, fmt.Errorf("schema ID is required")
 	}
+
+	// If no signer is provided, use the default private key signer
 	if signer == nil {
 		signer = ecdsa.NewPrivSigner()
 	}
 
-	return &CredentialBuilder{
+	return &AuthBuilder{
 		IssuerDID: issuerDID,
 		SchemaID:  schemaID,
 		Signer:    signer,
@@ -54,7 +41,7 @@ func NewCredentialBuilder(issuerDID, schemaID string, signer signer.Signer) (*Cr
 }
 
 // Build creates the VC-JWT payload and optionally signs it if a signer is available.
-func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts ...signer.SignOption) (*CredentialResult, error) {
+func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.SignOption) (*AuthResponse, error) {
 	// Holder DID is required
 	if data.HolderDID == "" {
 		return nil, fmt.Errorf("holder DID is required")
@@ -138,7 +125,7 @@ func (b *CredentialBuilder) Build(ctx context.Context, data CredentialData, opts
 		return nil, fmt.Errorf("failed to marshal document: %w", err)
 	}
 
-	return &CredentialResult{
+	return &AuthResponse{
 		Token: string(documentBytes),
 	}, nil
 }
