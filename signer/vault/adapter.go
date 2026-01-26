@@ -7,7 +7,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/signer"
 )
 
-// vaultSigner is the provider implementation that uses Vault for signing.
+// vaultSigner is the signer implementation that uses Vault for signing.
 type vaultSigner struct {
 	vault *Vault
 }
