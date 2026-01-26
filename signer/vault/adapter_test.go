@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	signer "github.com/pilacorp/go-auth-sdk/Signer"
+	"github.com/pilacorp/go-auth-sdk/signer"
 )
 
 func TestNewVaultSigner(t *testing.T) {
