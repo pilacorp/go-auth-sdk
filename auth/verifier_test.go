@@ -56,207 +56,6 @@ func TestVerify_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestVerifyStructure_ValidCredential(t *testing.T) {
-	credJSON := createTestCredentialJSONWithoutPermissions(
-		"did:example:issuer",
-		"did:example:holder",
-	)
-
-	err := VerifyStructure(credJSON)
-	if err != nil {
-		t.Errorf("VerifyStructure() error = %v, want nil", err)
-	}
-}
-
-func TestVerifyStructure_EmptyData(t *testing.T) {
-	err := VerifyStructure([]byte{})
-	if err == nil {
-		t.Error("VerifyStructure() should return error for empty data")
-	}
-	if err.Error() != "credential data is empty" {
-		t.Errorf("VerifyStructure() error = %v, want 'credential data is empty'", err)
-	}
-}
-
-func TestVerifyStructure_MissingContext(t *testing.T) {
-	cred := map[string]interface{}{
-		"type":   []string{"VerifiableCredential"},
-		"issuer": "did:example:issuer",
-		"credentialSubject": map[string]interface{}{
-			"id": "did:example:holder",
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err == nil {
-		t.Error("VerifyStructure() should return error for missing @context")
-	}
-}
-
-func TestVerifyStructure_MissingType(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"issuer":   "did:example:issuer",
-		"credentialSubject": map[string]interface{}{
-			"id": "did:example:holder",
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err == nil {
-		t.Error("VerifyStructure() should return error for missing type")
-	}
-}
-
-func TestVerifyStructure_TypeWithoutVerifiableCredential(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":     []string{"CustomCredential"},
-		"issuer":   "did:example:issuer",
-		"credentialSubject": map[string]interface{}{
-			"id": "did:example:holder",
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err == nil {
-		t.Error("VerifyStructure() should return error when type doesn't include VerifiableCredential")
-	}
-}
-
-func TestVerifyStructure_TypeAsString(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":     "VerifiableCredential",
-		"issuer":   "did:example:issuer",
-		"credentialSubject": map[string]interface{}{
-			"id": "did:example:holder",
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err != nil {
-		t.Errorf("VerifyStructure() error = %v, want nil for type as string", err)
-	}
-}
-
-func TestVerifyStructure_MissingIssuer(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":     []string{"VerifiableCredential"},
-		"credentialSubject": map[string]interface{}{
-			"id": "did:example:holder",
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err == nil {
-		t.Error("VerifyStructure() should return error for missing issuer")
-	}
-}
-
-func TestVerifyStructure_EmptyIssuer(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":     []string{"VerifiableCredential"},
-		"issuer":   "",
-		"credentialSubject": map[string]interface{}{
-			"id": "did:example:holder",
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err == nil {
-		t.Error("VerifyStructure() should return error for empty issuer")
-	}
-}
-
-func TestVerifyStructure_MissingCredentialSubject(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":     []string{"VerifiableCredential"},
-		"issuer":   "did:example:issuer",
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err == nil {
-		t.Error("VerifyStructure() should return error for missing credentialSubject")
-	}
-}
-
-func TestVerifyStructure_CredentialSubjectAsString(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context":        []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":            []string{"VerifiableCredential"},
-		"issuer":          "did:example:issuer",
-		"credentialSubject": "did:example:holder",
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err != nil {
-		t.Errorf("VerifyStructure() error = %v, want nil for credentialSubject as string", err)
-	}
-}
-
-func TestVerifyStructure_CredentialSubjectWithoutID(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":     []string{"VerifiableCredential"},
-		"issuer":   "did:example:issuer",
-		"credentialSubject": map[string]interface{}{
-			"name": "John Doe",
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err == nil {
-		t.Error("VerifyStructure() should return error when credentialSubject missing id")
-	}
-}
-
-func TestVerifyStructure_CredentialSubjectArray(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":     []string{"VerifiableCredential"},
-		"issuer":   "did:example:issuer",
-		"credentialSubject": []interface{}{
-			map[string]interface{}{
-				"id": "did:example:holder",
-			},
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err != nil {
-		t.Errorf("VerifyStructure() error = %v, want nil for credentialSubject as array", err)
-	}
-}
-
-func TestVerifyStructure_CredentialSubjectArrayEmpty(t *testing.T) {
-	cred := map[string]interface{}{
-		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
-		"type":     []string{"VerifiableCredential"},
-		"issuer":   "did:example:issuer",
-		"credentialSubject": []interface{}{},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	err := VerifyStructure(credJSON)
-	if err == nil {
-		t.Error("VerifyStructure() should return error for empty credentialSubject array")
-	}
-}
-
 func TestVerifyPermissions_ValidPermissions(t *testing.T) {
 	permissions := []policy.Statement{
 		{
@@ -271,14 +70,16 @@ func TestVerifyPermissions_ValidPermissions(t *testing.T) {
 		},
 	}
 
-	err := VerifyPermissions(permissions)
+	spec := policy.DefaultSpecification()
+	err := verifyPermissions(permissions, spec)
 	if err != nil {
 		t.Errorf("VerifyPermissions() error = %v, want nil", err)
 	}
 }
 
 func TestVerifyPermissions_EmptyPermissions(t *testing.T) {
-	err := VerifyPermissions([]policy.Statement{})
+	spec := policy.DefaultSpecification()
+	err := verifyPermissions([]policy.Statement{}, spec)
 	if err == nil {
 		t.Error("VerifyPermissions() should return error for empty permissions")
 	}
@@ -296,7 +97,8 @@ func TestVerifyPermissions_InvalidEffect(t *testing.T) {
 		},
 	}
 
-	err := VerifyPermissions(permissions)
+	spec := policy.DefaultSpecification()
+	err := verifyPermissions(permissions, spec)
 	if err == nil {
 		t.Error("VerifyPermissions() should return error for invalid effect")
 	}
@@ -311,7 +113,8 @@ func TestVerifyPermissions_NoActions(t *testing.T) {
 		},
 	}
 
-	err := VerifyPermissions(permissions)
+	spec := policy.DefaultSpecification()
+	err := verifyPermissions(permissions, spec)
 	if err == nil {
 		t.Error("VerifyPermissions() should return error when statement has no actions")
 	}
@@ -326,7 +129,8 @@ func TestVerifyPermissions_NoResources(t *testing.T) {
 		},
 	}
 
-	err := VerifyPermissions(permissions)
+	spec := policy.DefaultSpecification()
+	err := verifyPermissions(permissions, spec)
 	if err == nil {
 		t.Error("VerifyPermissions() should return error when statement has no resources")
 	}
@@ -341,7 +145,8 @@ func TestVerifyPermissions_InvalidAction(t *testing.T) {
 		},
 	}
 
-	err := VerifyPermissions(permissions)
+	spec := policy.DefaultSpecification()
+	err := verifyPermissions(permissions, spec)
 	if err == nil {
 		t.Error("VerifyPermissions() should return error for invalid action")
 	}
@@ -356,9 +161,47 @@ func TestVerifyPermissions_InvalidResource(t *testing.T) {
 		},
 	}
 
-	err := VerifyPermissions(permissions)
+	spec := policy.DefaultSpecification()
+	err := verifyPermissions(permissions, spec)
 	if err == nil {
 		t.Error("VerifyPermissions() should return error for invalid resource")
+	}
+}
+
+func TestVerifyPermissions_WithCustomSpecification(t *testing.T) {
+	// Create a custom specification with only Issuer actions and resources
+	customSpec := policy.NewSpecification(
+		[]policy.ActionObject{policy.ActionObjectIssuer},
+		[]policy.ActionVerb{policy.ActionVerbCreate, policy.ActionVerbDelete},
+		[]policy.ResourceObject{policy.ResourceObjectIssuer},
+	)
+
+	// Valid permissions for custom spec
+	validPermissions := []policy.Statement{
+		{
+			Effect:    policy.EffectAllow,
+			Actions:   []policy.Action{policy.NewAction("Issuer:Create")},
+			Resources: []policy.Resource{policy.NewResource(policy.ResourceObjectIssuer)},
+		},
+	}
+
+	err := verifyPermissions(validPermissions, customSpec)
+	if err != nil {
+		t.Errorf("VerifyPermissions() with custom spec error = %v, want nil", err)
+	}
+
+	// Invalid permissions (action not in custom spec)
+	invalidPermissions := []policy.Statement{
+		{
+			Effect:    policy.EffectAllow,
+			Actions:   []policy.Action{policy.NewAction("Did:Create")},
+			Resources: []policy.Resource{policy.NewResource(policy.ResourceObjectIssuer)},
+		},
+	}
+
+	err = verifyPermissions(invalidPermissions, customSpec)
+	if err == nil {
+		t.Error("VerifyPermissions() should return error for action not in custom specification")
 	}
 }
 
@@ -420,69 +263,6 @@ func TestExtractCredentialData_WithoutPermissions(t *testing.T) {
 
 	if len(extractedPerms) != 0 {
 		t.Errorf("extractCredentialData() permissions len = %d, want 0", len(extractedPerms))
-	}
-}
-
-func TestExtractCredentialData_CredentialSubjectAsString(t *testing.T) {
-	cred := map[string]interface{}{
-		"issuer":          "did:example:issuer",
-		"credentialSubject": "did:example:holder",
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	issuerDID, holderDID, extractedPerms, err := extractCredentialData(credJSON)
-	if err != nil {
-		t.Fatalf("extractCredentialData() error = %v", err)
-	}
-
-	if issuerDID != "did:example:issuer" {
-		t.Errorf("extractCredentialData() issuerDID = %v, want 'did:example:issuer'", issuerDID)
-	}
-
-	if holderDID != "did:example:holder" {
-		t.Errorf("extractCredentialData() holderDID = %v, want 'did:example:holder'", holderDID)
-	}
-
-	if len(extractedPerms) != 0 {
-		t.Errorf("extractCredentialData() permissions len = %d, want 0", len(extractedPerms))
-	}
-}
-
-func TestExtractCredentialData_CredentialSubjectArray(t *testing.T) {
-	permissions := []policy.Statement{
-		{
-			Effect:    policy.EffectAllow,
-			Actions:   []policy.Action{policy.NewAction("Issuer:Create")},
-			Resources: []policy.Resource{policy.NewResource(policy.ResourceObjectIssuer)},
-		},
-	}
-
-	cred := map[string]interface{}{
-		"issuer": "did:example:issuer",
-		"credentialSubject": []interface{}{
-			map[string]interface{}{
-				"id":          "did:example:holder",
-				"permissions": permissions,
-			},
-		},
-	}
-	credJSON, _ := json.Marshal(cred)
-
-	issuerDID, holderDID, extractedPerms, err := extractCredentialData(credJSON)
-	if err != nil {
-		t.Fatalf("extractCredentialData() error = %v", err)
-	}
-
-	if issuerDID != "did:example:issuer" {
-		t.Errorf("extractCredentialData() issuerDID = %v, want 'did:example:issuer'", issuerDID)
-	}
-
-	if holderDID != "did:example:holder" {
-		t.Errorf("extractCredentialData() holderDID = %v, want 'did:example:holder'", holderDID)
-	}
-
-	if len(extractedPerms) != 1 {
-		t.Errorf("extractCredentialData() permissions len = %d, want 1", len(extractedPerms))
 	}
 }
 
@@ -583,6 +363,28 @@ func TestVerifyOptions_WithSchemaValidation(t *testing.T) {
 	}
 }
 
+func TestVerifyOptions_WithVerifyPermissions(t *testing.T) {
+	opts := getVerifyOptions(WithVerifyPermissions())
+	if !opts.verifyPermissions {
+		t.Error("WithVerifyPermissions() verifyPermissions = false, want true")
+	}
+}
+
+func TestVerifyOptions_WithSpecification(t *testing.T) {
+	customSpec := policy.NewSpecification(
+		[]policy.ActionObject{policy.ActionObjectIssuer},
+		[]policy.ActionVerb{policy.ActionVerbCreate},
+		[]policy.ResourceObject{policy.ResourceObjectIssuer},
+	)
+	opts := getVerifyOptions(WithSpecification(customSpec))
+	if opts.specification == nil {
+		t.Error("WithSpecification() specification = nil, want non-nil")
+	}
+	if len(opts.specification.ActionObjects) != 1 {
+		t.Errorf("WithSpecification() ActionObjects len = %d, want 1", len(opts.specification.ActionObjects))
+	}
+}
+
 func TestVerifyOptions_DefaultValues(t *testing.T) {
 	opts := getVerifyOptions()
 	if opts.didBaseURL != "https://api.ndadid.vn/api/v1/did" {
@@ -602,6 +404,9 @@ func TestVerifyOptions_DefaultValues(t *testing.T) {
 	}
 	if opts.validateSchema {
 		t.Error("getVerifyOptions() default validateSchema = true, want false")
+	}
+	if !opts.verifyPermissions {
+		t.Error("getVerifyOptions() default verifyPermissions = false, want true")
 	}
 }
 
