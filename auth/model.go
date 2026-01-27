@@ -5,14 +5,16 @@ import (
 	"time"
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
 // AuthData holds the authentication-specific data.
 type AuthData struct {
-	HolderDID  string
-	Policy     policy.Policy
-	ValidFrom  *time.Time
-	ValidUntil *time.Time
+	HolderDID        string
+	Policy           policy.Policy
+	ValidFrom        *time.Time
+	ValidUntil       *time.Time
+	CredentialStatus []vc.Status
 }
 
 // AuthResponse represents the result of building an authentication.
