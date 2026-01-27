@@ -16,7 +16,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Create and Verify Credential ===\n")
+	fmt.Print("=== Create and Verify Credential ===\n\n")
 
 	// Step 1: Generate a private key for signing
 	privateKey, err := crypto.GenerateKey()

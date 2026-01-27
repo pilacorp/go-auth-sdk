@@ -16,7 +16,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Building Verifiable Credential ===")
+	fmt.Print("=== Building Verifiable Credential ===\n\n")
 
 	// Step 1: Generate a private key for signing
 	// In production, you would load this from secure storage

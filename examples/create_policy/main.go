@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Creating and Validating Policies ===\n")
+	fmt.Print("=== Creating and Validating Policies ===\n\n")
 
 	// Example 1: Create a simple policy with default specification
 	fmt.Println("Example 1: Simple Policy")
