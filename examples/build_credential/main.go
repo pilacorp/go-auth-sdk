@@ -65,27 +65,21 @@ func main() {
 	validUntil := time.Now().Add(24 * time.Hour)
 	fmt.Println("✓ Set validity period")
 
-	// Step 5: Create AuthBuilder
+	// Step 5: Prepare issuer and schema information
 	issuerDID := "did:example:issuer"
 	schemaID := "https://example.com/schema/v1"
-	builder, err := auth.NewAuthBuilder(
-		issuerDID,
-		schemaID,
-		ecdsaSigner,
-	)
-	if err != nil {
-		log.Fatalf("Failed to create AuthBuilder: %v", err)
-	}
-	fmt.Printf("✓ Created AuthBuilder (Issuer: %s, Schema: %s)\n", issuerDID, schemaID)
+	fmt.Printf("✓ Using IssuerDID: %s, SchemaID: %s\n", issuerDID, schemaID)
 
 	// Step 6: Build the credential
 	holderDID := "did:example:holder"
-	result, err := builder.Build(ctx, auth.AuthData{
+	result, err := auth.Build(ctx, auth.AuthData{
+		IssuerDID:  issuerDID,
+		SchemaID:   schemaID,
 		HolderDID:  holderDID,
 		Policy:     testPolicy,
 		ValidFrom:  &validFrom,
 		ValidUntil: &validUntil,
-	}, signer.WithPrivateKey(privateKeyBytes))
+	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 	if err != nil {
 		log.Fatalf("Failed to build credential: %v", err)
 	}

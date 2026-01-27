@@ -19,46 +19,20 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-// AuthBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
-type AuthBuilder struct {
-	IssuerDID string
-	SchemaID  string
-	Signer    signer.Signer
-}
-
-// NewAuthBuilder creates a new reusable AuthBuilder.
-func NewAuthBuilder(issuerDID, schemaID string, signer signer.Signer) (*AuthBuilder, error) {
-	if issuerDID == "" {
-		return nil, fmt.Errorf("issuer DID is required")
-	}
-	if schemaID == "" {
-		return nil, fmt.Errorf("schema ID is required")
-	}
-
-	// If no signer is provided, use the default private key signer
+// Build creates the VC-JWT payload and optionally signs it if a signer is available.
+func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...signer.SignOption) (*AuthResponse, error) {
+	// If signer is not provided, use ECDSA signer
 	if signer == nil {
 		signer = ecdsa.NewPrivSigner()
 	}
 
-	return &AuthBuilder{
-		IssuerDID: issuerDID,
-		SchemaID:  schemaID,
-		Signer:    signer,
-	}, nil
-}
-
-// Build creates the VC-JWT payload and optionally signs it if a signer is available.
-func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.SignOption) (*AuthResponse, error) {
-	// Holder DID is required
-	if data.HolderDID == "" {
-		return nil, fmt.Errorf("holder DID is required")
+	if err := validateAuthData(data); err != nil {
+		return nil, err
 	}
-
 	// Build credential subject with permissions
 	// vc.Subject has ID and CustomFields
 	customFields := make(map[string]any)
 	customFields["permissions"] = data.Policy.Permissions
-
 	subject := vc.Subject{
 		ID:           data.HolderDID,
 		CustomFields: customFields,
@@ -74,11 +48,11 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 		},
 		Schemas: []vc.Schema{
 			{
-				ID:   b.SchemaID,
+				ID:   data.SchemaID,
 				Type: "JsonSchema",
 			},
 		},
-		Issuer:           b.IssuerDID,
+		Issuer:           data.IssuerDID,
 		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject:          subjects,
 		CredentialStatus: data.CredentialStatus,
@@ -109,7 +83,7 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 	hash := sha256.Sum256(signData)
 
 	// Sign the credential
-	signature, err := b.Signer.Sign(ctx, hash[:], opts...)
+	signature, err := signer.Sign(ctx, hash[:], opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign credential: %w", err)
 	}
@@ -136,4 +110,21 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 	return &AuthResponse{
 		Token: string(documentBytes),
 	}, nil
+}
+
+// validateAuthData validates that the required fields in AuthData are present.
+func validateAuthData(data AuthData) error {
+	if data.SchemaID == "" {
+		return fmt.Errorf("schema ID is required")
+	}
+
+	if data.IssuerDID == "" {
+		return fmt.Errorf("issuer DID is required")
+	}
+
+	if data.HolderDID == "" {
+		return fmt.Errorf("holder DID is required")
+	}
+
+	return nil
 }
