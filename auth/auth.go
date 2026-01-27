@@ -1,3 +1,10 @@
+// Package auth provides the main API for building JWT Authorization Credentials (VC-JWT) with embedded permission policies.
+// It supports both local private key and Vault signers.
+// The package provides:
+//   - AuthBuilder: A builder for creating and signing VC-JWT credentials with embedded permissions
+//   - Verify: A function for verifying VC-JWT credentials and extracting permissions
+//   - Verification options: Configurable options for proof verification, expiration checks, etc.
+
 package auth
 
 import (

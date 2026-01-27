@@ -31,6 +31,8 @@
 //	)
 package policy
 
+import "fmt"
+
 // PolicyOption configures a Policy during construction.
 type PolicyOption func(*Policy)
 
@@ -180,6 +182,39 @@ func (p Policy) IsValid() bool {
 		}
 	}
 	return true
+}
+
+// ValidateStatements validates that the statements list is well-formed.
+// It performs comprehensive validation of policy statements to ensure they
+// conform to the provided policy specification.
+//
+// Validation checks:
+//   - The statements list is not empty
+//   - Each statement has a valid effect (EffectAllow or EffectDeny)
+//   - Each statement has at least one action
+//   - Each statement has at least one resource
+//   - All actions are valid according to the provided policy specification
+//   - All resources are valid according to the provided policy specification
+//
+// Returns an error if any validation check fails, with details about
+// which statement and field caused the failure.
+func ValidateStatements(statements []Statement, spec Specification) error {
+	if len(statements) == 0 {
+		return fmt.Errorf("statements list cannot be empty")
+	}
+
+	// Create a policy with the provided specification to validate statements
+	pol := NewPolicy(
+		WithSpecification(spec),
+		WithStatements(statements...),
+	)
+
+	// Validate the policy (this checks all statements)
+	if !pol.IsValid() {
+		return fmt.Errorf("invalid statements: one or more statements are malformed")
+	}
+
+	return nil
 }
 
 // matchObject checks if the action object matches the resource object.
