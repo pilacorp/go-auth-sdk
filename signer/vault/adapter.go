@@ -3,6 +3,8 @@ package vault
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/pilacorp/go-auth-sdk/signer"
 )
@@ -28,4 +30,18 @@ func (v *vaultSigner) Sign(ctx context.Context, payload []byte, opts ...signer.S
 	}
 
 	return v.vault.SignMessage(ctx, payload, options.SignerAddress)
+}
+
+// GetAddress gets the address of the signer.
+func (v *vaultSigner) GetAddress(opts ...signer.SignOption) (string, error) {
+	options := &signer.SignOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	if options.SignerAddress == "" {
+		return "", fmt.Errorf("signer address is required for Vault signer")
+	}
+
+	return strings.ToLower(options.SignerAddress), nil
 }

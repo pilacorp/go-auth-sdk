@@ -2,7 +2,9 @@
 // It supports both local private key and Vault signers.
 package signer
 
-import "context"
+import (
+	"context"
+)
 
 // SignOptions represents the options for signing a payload.
 type SignOptions struct {
@@ -17,6 +19,7 @@ type SignOption func(*SignOptions)
 // Sign should take an arbitrary payload and return the signed token bytes.
 type Signer interface {
 	Sign(ctx context.Context, payload []byte, opts ...SignOption) ([]byte, error)
+	GetAddress(opts ...SignOption) (string, error)
 }
 
 // WithSignerAddress sets the signer address for the signing operation.

@@ -20,6 +20,32 @@ func TestNewVaultSigner(t *testing.T) {
 	// Verify it implements the Signer interface
 	var _ signer.Signer = s
 }
+
+func TestVaultSigner_GetAddress(t *testing.T) {
+	s := NewVaultSigner("http://localhost:8200", "test-token")
+	address := "0x1234567890123456789012345678901234567890"
+
+	got, err := s.(*vaultSigner).GetAddress(signer.WithSignerAddress(address))
+	if err != nil {
+		t.Fatalf("GetAddress() unexpected error: %v", err)
+	}
+	if got != address {
+		t.Errorf("GetAddress() = %v, want %v", got, address)
+	}
+}
+
+func TestVaultSigner_GetAddress_MissingAddress(t *testing.T) {
+	s := NewVaultSigner("http://localhost:8200", "test-token")
+
+	got, err := s.(*vaultSigner).GetAddress()
+	if err == nil {
+		t.Fatalf("GetAddress() expected error but got nil")
+	}
+	if got != "" {
+		t.Errorf("GetAddress() = %v, want empty string on error", got)
+	}
+}
+
 func TestVaultSigner_Sign_Success(t *testing.T) {
 	payload := make([]byte, 32)
 	copy(payload, []byte("test payload 32 bytes long!!"))

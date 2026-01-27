@@ -21,16 +21,17 @@ import (
 
 // AuthBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
 type AuthBuilder struct {
-	IssuerDID string
+	DidMethod string
 	SchemaID  string
 	Signer    signer.Signer
 }
 
 // NewAuthBuilder creates a new reusable AuthBuilder.
-func NewAuthBuilder(issuerDID, schemaID string, signer signer.Signer) (*AuthBuilder, error) {
-	if issuerDID == "" {
-		return nil, fmt.Errorf("issuer DID is required")
+func NewAuthBuilder(didMethod, schemaID string, signer signer.Signer) (*AuthBuilder, error) {
+	if didMethod == "" {
+		return nil, fmt.Errorf("DID method is required")
 	}
+
 	if schemaID == "" {
 		return nil, fmt.Errorf("schema ID is required")
 	}
@@ -41,7 +42,7 @@ func NewAuthBuilder(issuerDID, schemaID string, signer signer.Signer) (*AuthBuil
 	}
 
 	return &AuthBuilder{
-		IssuerDID: issuerDID,
+		DidMethod: didMethod,
 		SchemaID:  schemaID,
 		Signer:    signer,
 	}, nil
@@ -64,6 +65,11 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 		CustomFields: customFields,
 	}
 
+	issuer, err := b.Signer.GetAddress(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get issuer address: %w", err)
+	}
+
 	// Build credential contents
 	subjects := []vc.Subject{subject}
 
@@ -78,7 +84,7 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 				Type: "JsonSchema",
 			},
 		},
-		Issuer:           b.IssuerDID,
+		Issuer:           fmt.Sprintf("%s:%s", b.DidMethod, issuer),
 		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject:          subjects,
 		CredentialStatus: data.CredentialStatus,

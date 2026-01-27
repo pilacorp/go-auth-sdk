@@ -88,3 +88,35 @@ func TestProviderPriv_Sign(t *testing.T) {
 		})
 	}
 }
+
+func TestPrivSigner_GetAddress(t *testing.T) {
+	// Generate a valid private key for testing
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	expectedAddr := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+
+	p := NewPrivSigner().(*privSigner)
+
+	addr, err := p.GetAddress(signer.WithPrivateKey(privateKeyBytes))
+	if err != nil {
+		t.Fatalf("GetAddress() unexpected error: %v", err)
+	}
+	if addr != expectedAddr {
+		t.Errorf("GetAddress() = %v, want %v", addr, expectedAddr)
+	}
+}
+
+func TestPrivSigner_GetAddress_MissingPrivateKey(t *testing.T) {
+	p := NewPrivSigner().(*privSigner)
+
+	addr, err := p.GetAddress()
+	if err == nil {
+		t.Fatalf("GetAddress() expected error but got nil")
+	}
+	if addr != "" {
+		t.Errorf("GetAddress() = %v, want empty string on error", addr)
+	}
+}

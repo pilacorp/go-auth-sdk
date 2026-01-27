@@ -4,6 +4,7 @@ package ecdsa
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pilacorp/go-auth-sdk/signer"
@@ -35,4 +36,23 @@ func (p *privSigner) Sign(ctx context.Context, payload []byte, opts ...signer.Si
 	}
 
 	return sig[:64], nil
+}
+
+// GetAddress gets the address of the signer.
+func (p *privSigner) GetAddress(opts ...signer.SignOption) (string, error) {
+	options := &signer.SignOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	if len(options.PrivateKey) == 0 {
+		return "", fmt.Errorf("private key is required to derive address")
+	}
+
+	privateKey, err := crypto.ToECDSA(options.PrivateKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to reconstruct private key from retrieved hex: %w", err)
+	}
+
+	return strings.ToLower(crypto.PubkeyToAddress(privateKey.PublicKey).Hex()), nil
 }

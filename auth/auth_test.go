@@ -57,12 +57,12 @@ func TestAuthBuilder_Build(t *testing.T) {
 	validFrom := time.Now()
 	validUntil := time.Now().Add(24 * time.Hour)
 	schemaID := "https://example.com/schema/v1"
-	issuerDID := "did:example:issuer"
+	didMethod := "did:example"
 	holderDID := "did:example:holder"
 
 	// Build credential with all options
 	builder, err := NewAuthBuilder(
-		issuerDID,
+		didMethod,
 		schemaID,
 		ecdsaSigner,
 	)
@@ -101,14 +101,14 @@ func TestAuthBuilder_Build(t *testing.T) {
 	t.Logf("Credential: %s", result.Token)
 }
 
-func TestNewAuthBuilder_EmptyIssuerDID(t *testing.T) {
+func TestNewAuthBuilder_EmptyDidMethod(t *testing.T) {
 	ecdsaSigner := ecdsa.NewPrivSigner()
 	_, err := NewAuthBuilder("", "https://example.com/schema/v1", ecdsaSigner)
 	if err == nil {
-		t.Error("NewAuthBuilder() should return error for empty issuerDID")
+		t.Error("NewAuthBuilder() should return error for empty didMethod")
 	}
-	if err.Error() != "issuer DID is required" {
-		t.Errorf("NewAuthBuilder() error = %v, want 'issuer DID is required'", err)
+	if err.Error() != "DID method is required" {
+		t.Errorf("NewAuthBuilder() error = %v, want 'DID method is required'", err)
 	}
 }
 
