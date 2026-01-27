@@ -4,31 +4,31 @@ This directory contains runnable examples demonstrating Auth SDK usage.
 
 ## Examples
 
-### 1. `build_credential.go` - Building Credentials
+### 1. Build Credential
 
 Shows how to create and sign a Verifiable Credential with permissions.
 
 **Run:**
 ```bash
-go run examples/build_credential.go
+go run examples/build_credential/main.go
 ```
 
-### 2. `verify_credential.go` - Verifying Credentials
+### 2. Verify Credential
 
 Shows how to create a credential token and verify it.
 
 **Run:**
 ```bash
-go run examples/verify_credential.go
+go run examples/verify_credential/main.go
 ```
 
-### 3. `create_policy.go` - Creating Policies
+### 3. Create Policy
 
 Shows how to create and validate policies with different configurations.
 
 **Run:**
 ```bash
-go run examples/create_policy.go
+go run examples/create_policy/main.go
 ```
 
 ## Quick Start
