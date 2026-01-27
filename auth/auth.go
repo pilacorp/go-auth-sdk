@@ -78,9 +78,10 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 				Type: "JsonSchema",
 			},
 		},
-		Issuer:  b.IssuerDID,
-		Types:   []string{"VerifiableCredential", "AuthorizationCredential"},
-		Subject: subjects,
+		Issuer:           b.IssuerDID,
+		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
+		Subject:          subjects,
+		CredentialStatus: data.CredentialStatus,
 	}
 
 	// Add validity period if provided

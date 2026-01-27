@@ -14,6 +14,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	"github.com/pilacorp/go-auth-sdk/signer/vault"
+	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
 func TestAuthBuilder_Build(t *testing.T) {
@@ -69,11 +70,23 @@ func TestAuthBuilder_Build(t *testing.T) {
 		t.Fatalf("Failed to create credential builder: %v", err)
 	}
 
+	statusListCred := "https://example.com/status/1"
+	expectedStatus := []vc.Status{
+		{
+			ID:                   "https://example.com/status/1#1",
+			Type:                 "StatusList2021Entry",
+			StatusPurpose:        "revocation",
+			StatusListIndex:      "1",
+			StatusListCredential: statusListCred,
+		},
+	}
+
 	result, err := builder.Build(ctx, AuthData{
-		HolderDID:  holderDID,
-		Policy:     testPolicy,
-		ValidFrom:  &validFrom,
-		ValidUntil: &validUntil,
+		HolderDID:        holderDID,
+		Policy:           testPolicy,
+		ValidFrom:        &validFrom,
+		ValidUntil:       &validUntil,
+		CredentialStatus: expectedStatus,
 	}, signer.WithPrivateKey(privateKeyBytes))
 	if err != nil {
 		t.Fatalf("Build() unexpected error: %v", err)
