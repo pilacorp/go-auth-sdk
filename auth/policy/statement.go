@@ -39,6 +39,14 @@ func (s *Statement) SetConditions(conditions Condition) {
 
 // isValid checks if the statement is valid.
 func (s *Statement) isValid(specification Specification) bool {
+	if len(s.Actions) == 0 {
+		return false
+	}
+
+	if len(s.Resources) == 0 {
+		return false
+	}
+
 	isActionValid := true
 	for _, action := range s.Actions {
 		if !action.isValid(specification) {

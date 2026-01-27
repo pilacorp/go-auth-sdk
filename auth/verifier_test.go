@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +42,7 @@ func createTestCredentialJSONWithoutPermissions(issuerDID, holderDID string) []b
 }
 
 func TestVerify_EmptyCredential(t *testing.T) {
-	_, err := Verify([]byte{}, WithVerifyProof())
+	_, err := Verify(context.Background(), []byte{}, WithVerifyProof())
 	if err == nil {
 		t.Error("Verify() should return error for empty credential")
 	}
@@ -50,7 +52,7 @@ func TestVerify_EmptyCredential(t *testing.T) {
 }
 
 func TestVerify_InvalidJSON(t *testing.T) {
-	_, err := Verify([]byte("invalid json"), WithVerifyProof())
+	_, err := Verify(context.Background(), []byte("invalid json"), WithVerifyProof())
 	if err == nil {
 		t.Error("Verify() should return error for invalid JSON")
 	}
@@ -291,22 +293,20 @@ func TestExtractCredentialData_MissingCredentialSubject(t *testing.T) {
 }
 
 func TestExtractCredentialData_PermissionsAsPolicy(t *testing.T) {
-	// Test when permissions are wrapped in a Policy object
-	policyObj := policy.NewPolicy(
-		policy.WithStatements(
-			policy.Statement{
-				Effect:    policy.EffectAllow,
-				Actions:   []policy.Action{policy.NewAction("Issuer:Create")},
-				Resources: []policy.Resource{policy.NewResource(policy.ResourceObjectIssuer)},
-			},
-		),
-	)
+	// Test when permissions are an array of statements
+	permissions := []policy.Statement{
+		{
+			Effect:    policy.EffectAllow,
+			Actions:   []policy.Action{policy.NewAction("Issuer:Create")},
+			Resources: []policy.Resource{policy.NewResource(policy.ResourceObjectIssuer)},
+		},
+	}
 
 	cred := map[string]interface{}{
 		"issuer": "did:example:issuer",
 		"credentialSubject": map[string]interface{}{
 			"id":          "did:example:holder",
-			"permissions": policyObj,
+			"permissions": permissions,
 		},
 	}
 	credJSON, _ := json.Marshal(cred)
@@ -322,50 +322,137 @@ func TestExtractCredentialData_PermissionsAsPolicy(t *testing.T) {
 }
 
 func TestVerifyOptions_WithDIDBaseURL(t *testing.T) {
-	opts := getVerifyOptions(WithDIDBaseURL("https://custom.did.url"))
+	opts, err := getVerifyOptions(WithDIDBaseURL("https://custom.did.url"))
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
 	if opts.didBaseURL != "https://custom.did.url" {
 		t.Errorf("WithDIDBaseURL() didBaseURL = %v, want 'https://custom.did.url'", opts.didBaseURL)
 	}
 }
 
+func TestVerifyOptions_InvalidDIDBaseURL(t *testing.T) {
+	testCases := []struct {
+		name    string
+		baseURL string
+		wantErr string
+	}{
+		{
+			name:    "invalid URL format",
+			baseURL: "not-a-valid-url",
+			wantErr: "didBaseURL must have http or https scheme",
+		},
+		{
+			name:    "missing scheme",
+			baseURL: "example.com/did",
+			wantErr: "didBaseURL must have http or https scheme",
+		},
+		{
+			name:    "invalid scheme",
+			baseURL: "ftp://example.com/did",
+			wantErr: "didBaseURL must have http or https scheme",
+		},
+		{
+			name:    "missing host",
+			baseURL: "https://",
+			wantErr: "didBaseURL must have a host",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := getVerifyOptions(WithDIDBaseURL(tc.baseURL))
+			if err == nil {
+				t.Error("getVerifyOptions() should return error for invalid URL")
+				return
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("getVerifyOptions() error message should contain %q, got: %v", tc.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestVerifyOptions_ValidURLs(t *testing.T) {
+	testCases := []struct {
+		name    string
+		baseURL string
+	}{
+		{"HTTPS URL", "https://api.example.com/did"},
+		{"HTTP URL", "http://localhost:8200/did"},
+		{"URL with path", "https://api.ndadid.vn/api/v1/did"},
+		{"URL with port", "https://api.example.com:443/did"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts, err := getVerifyOptions(WithDIDBaseURL(tc.baseURL))
+			if err != nil {
+				t.Errorf("getVerifyOptions() with valid URL %q returned error: %v", tc.baseURL, err)
+			}
+			if opts.didBaseURL != tc.baseURL {
+				t.Errorf("getVerifyOptions() didBaseURL = %v, want %v", opts.didBaseURL, tc.baseURL)
+			}
+		})
+	}
+}
+
 func TestVerifyOptions_WithVerificationMethodKey(t *testing.T) {
-	opts := getVerifyOptions(WithVerificationMethodKey("key-2"))
+	opts, err := getVerifyOptions(WithVerificationMethodKey("key-2"))
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
 	if opts.verificationMethodKey != "key-2" {
 		t.Errorf("WithVerificationMethodKey() verificationMethodKey = %v, want 'key-2'", opts.verificationMethodKey)
 	}
 }
 
 func TestVerifyOptions_WithVerifyProof(t *testing.T) {
-	opts := getVerifyOptions(WithVerifyProof())
-	if !opts.verifyProof {
+	opts, err := getVerifyOptions(WithVerifyProof())
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
+	if !opts.isVerifyProof {
 		t.Error("WithVerifyProof() verifyProof = false, want true")
 	}
 }
 
 func TestVerifyOptions_WithCheckExpiration(t *testing.T) {
-	opts := getVerifyOptions(WithCheckExpiration())
-	if !opts.checkExpiration {
+	opts, err := getVerifyOptions(WithCheckExpiration())
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
+	if !opts.isCheckExpiration {
 		t.Error("WithCheckExpiration() checkExpiration = false, want true")
 	}
 }
 
 func TestVerifyOptions_WithCheckRevocation(t *testing.T) {
-	opts := getVerifyOptions(WithCheckRevocation())
-	if !opts.checkRevocation {
+	opts, err := getVerifyOptions(WithCheckRevocation())
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
+	if !opts.isCheckRevocation {
 		t.Error("WithCheckRevocation() checkRevocation = false, want true")
 	}
 }
 
 func TestVerifyOptions_WithSchemaValidation(t *testing.T) {
-	opts := getVerifyOptions(WithSchemaValidation())
-	if !opts.validateSchema {
+	opts, err := getVerifyOptions(WithSchemaValidation())
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
+	if !opts.isValidateSchema {
 		t.Error("WithSchemaValidation() validateSchema = false, want true")
 	}
 }
 
 func TestVerifyOptions_WithVerifyPermissions(t *testing.T) {
-	opts := getVerifyOptions(WithVerifyPermissions())
-	if !opts.verifyPermissions {
+	opts, err := getVerifyOptions(WithVerifyPermissions())
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
+	if !opts.isVerifyPermissions {
 		t.Error("WithVerifyPermissions() verifyPermissions = false, want true")
 	}
 }
@@ -376,7 +463,10 @@ func TestVerifyOptions_WithSpecification(t *testing.T) {
 		[]policy.ActionVerb{policy.ActionVerbCreate},
 		[]policy.ResourceObject{policy.ResourceObjectIssuer},
 	)
-	opts := getVerifyOptions(WithSpecification(customSpec))
+	opts, err := getVerifyOptions(WithSpecification(customSpec))
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
 	if opts.specification == nil {
 		t.Error("WithSpecification() specification = nil, want non-nil")
 	}
@@ -386,37 +476,43 @@ func TestVerifyOptions_WithSpecification(t *testing.T) {
 }
 
 func TestVerifyOptions_DefaultValues(t *testing.T) {
-	opts := getVerifyOptions()
+	opts, err := getVerifyOptions()
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
 	if opts.didBaseURL != "https://api.ndadid.vn/api/v1/did" {
 		t.Errorf("getVerifyOptions() default didBaseURL = %v, want 'https://api.ndadid.vn/api/v1/did'", opts.didBaseURL)
 	}
 	if opts.verificationMethodKey != "key-1" {
 		t.Errorf("getVerifyOptions() default verificationMethodKey = %v, want 'key-1'", opts.verificationMethodKey)
 	}
-	if opts.verifyProof {
+	if opts.isVerifyProof {
 		t.Error("getVerifyOptions() default verifyProof = true, want false")
 	}
-	if opts.checkExpiration {
+	if opts.isCheckExpiration {
 		t.Error("getVerifyOptions() default checkExpiration = true, want false")
 	}
-	if opts.checkRevocation {
+	if opts.isCheckRevocation {
 		t.Error("getVerifyOptions() default checkRevocation = true, want false")
 	}
-	if opts.validateSchema {
+	if opts.isValidateSchema {
 		t.Error("getVerifyOptions() default validateSchema = true, want false")
 	}
-	if !opts.verifyPermissions {
+	if !opts.isVerifyPermissions {
 		t.Error("getVerifyOptions() default verifyPermissions = false, want true")
 	}
 }
 
 func TestVerifyOptions_MultipleOptions(t *testing.T) {
-	opts := getVerifyOptions(
+	opts, err := getVerifyOptions(
 		WithDIDBaseURL("https://custom.url"),
 		WithVerificationMethodKey("key-3"),
 		WithVerifyProof(),
 		WithCheckExpiration(),
 	)
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
 
 	if opts.didBaseURL != "https://custom.url" {
 		t.Errorf("Multiple options: didBaseURL = %v, want 'https://custom.url'", opts.didBaseURL)
@@ -424,10 +520,10 @@ func TestVerifyOptions_MultipleOptions(t *testing.T) {
 	if opts.verificationMethodKey != "key-3" {
 		t.Errorf("Multiple options: verificationMethodKey = %v, want 'key-3'", opts.verificationMethodKey)
 	}
-	if !opts.verifyProof {
+	if !opts.isVerifyProof {
 		t.Error("Multiple options: verifyProof = false, want true")
 	}
-	if !opts.checkExpiration {
+	if !opts.isCheckExpiration {
 		t.Error("Multiple options: checkExpiration = false, want true")
 	}
 }
@@ -436,10 +532,10 @@ func TestBuildCredentialOptions(t *testing.T) {
 	verifyOpts := &verifyOptions{
 		didBaseURL:            "https://test.did.url",
 		verificationMethodKey: "key-test",
-		verifyProof:           true,
-		checkExpiration:       true,
-		checkRevocation:       false,
-		validateSchema:        true,
+		isVerifyProof:         true,
+		isCheckExpiration:     true,
+		isCheckRevocation:     false,
+		isValidateSchema:      true,
 	}
 
 	credOpts := buildCredentialOptions(verifyOpts)
@@ -459,10 +555,10 @@ func TestBuildCredentialOptions_EmptyBaseURL(t *testing.T) {
 	verifyOpts := &verifyOptions{
 		didBaseURL:            "",
 		verificationMethodKey: "key-1",
-		verifyProof:           false,
-		checkExpiration:       false,
-		checkRevocation:       false,
-		validateSchema:        false,
+		isVerifyProof:         false,
+		isCheckExpiration:     false,
+		isCheckRevocation:     false,
+		isValidateSchema:      false,
 	}
 
 	credOpts := buildCredentialOptions(verifyOpts)

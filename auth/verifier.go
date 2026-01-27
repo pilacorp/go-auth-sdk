@@ -1,33 +1,14 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
-
-// VerifyResult represents the normalized result of credential verification.
-// It contains the extracted issuer DID, holder DID, and validated permissions
-// from a successfully verified credential.
-type VerifyResult struct {
-	IssuerDID   string             // The issuer DID from the credential
-	HolderDID   string             // The holder DID from credentialSubject.id
-	Permissions []policy.Statement // The extracted and validated permissions
-}
-
-// credentialSubject represents a credentialSubject object with id and optional permissions.
-type credentialSubject struct {
-	ID          string          `json:"id"`
-	Permissions json.RawMessage `json:"permissions,omitempty"`
-}
-
-// credentialData represents the structure of credential data (without proof).
-type credentialData struct {
-	Issuer            string            `json:"issuer"`
-	CredentialSubject credentialSubject `json:"credentialSubject"`
-}
 
 // VerifyOpt configures verification options for credential verification.
 // Options can be combined to enable different verification checks.
@@ -39,13 +20,33 @@ type verifyOptions struct {
 	// Verification options from go-credential-sdk
 	didBaseURL            string
 	verificationMethodKey string
-	verifyProof           bool
-	checkExpiration       bool
-	checkRevocation       bool
-	validateSchema        bool
+	isVerifyProof         bool
+	isCheckExpiration     bool
+	isCheckRevocation     bool
+	isValidateSchema      bool
 	// Auth SDK specific options
-	verifyPermissions bool
-	specification     *policy.Specification
+	isVerifyPermissions bool
+	specification       *policy.Specification
+}
+
+func (o *verifyOptions) validate() error {
+	// check if didBaseURL is a valid URL
+	if o.didBaseURL != "" {
+		parsedURL, err := url.Parse(o.didBaseURL)
+		if err != nil {
+			return fmt.Errorf("didBaseURL is not a valid URL: %w", err)
+		}
+		// Check that URL has a valid scheme (http or https)
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			return fmt.Errorf("didBaseURL must have http or https scheme, got: %s", parsedURL.Scheme)
+		}
+		// Check that URL has a host
+		if parsedURL.Host == "" {
+			return fmt.Errorf("didBaseURL must have a host")
+		}
+	}
+
+	return nil
 }
 
 // WithDIDBaseURL sets the DID base URL for credential verification.
@@ -71,7 +72,7 @@ func WithVerificationMethodKey(key string) VerifyOpt {
 // the issuer's public key from their DID document.
 func WithVerifyProof() VerifyOpt {
 	return func(o *verifyOptions) {
-		o.verifyProof = true
+		o.isVerifyProof = true
 	}
 }
 
@@ -80,7 +81,7 @@ func WithVerifyProof() VerifyOpt {
 // (validFrom <= current time <= validUntil).
 func WithCheckExpiration() VerifyOpt {
 	return func(o *verifyOptions) {
-		o.checkExpiration = true
+		o.isCheckExpiration = true
 	}
 }
 
@@ -89,7 +90,7 @@ func WithCheckExpiration() VerifyOpt {
 // credentialStatus field. This requires network access to the status registry.
 func WithCheckRevocation() VerifyOpt {
 	return func(o *verifyOptions) {
-		o.checkRevocation = true
+		o.isCheckRevocation = true
 	}
 }
 
@@ -98,7 +99,7 @@ func WithCheckRevocation() VerifyOpt {
 // using the credentialSchema field.
 func WithSchemaValidation() VerifyOpt {
 	return func(o *verifyOptions) {
-		o.validateSchema = true
+		o.isValidateSchema = true
 	}
 }
 
@@ -108,7 +109,7 @@ func WithSchemaValidation() VerifyOpt {
 // Defaults to true if not specified.
 func WithVerifyPermissions() VerifyOpt {
 	return func(o *verifyOptions) {
-		o.verifyPermissions = true
+		o.isVerifyPermissions = true
 	}
 }
 
@@ -122,16 +123,16 @@ func WithSpecification(spec policy.Specification) VerifyOpt {
 
 // getVerifyOptions returns the verification options with defaults applied.
 // It processes all provided options and returns a configured verifyOptions struct.
-func getVerifyOptions(opts ...VerifyOpt) *verifyOptions {
+func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
 	defaultSpec := policy.DefaultSpecification()
 	options := &verifyOptions{
 		didBaseURL:            "https://api.ndadid.vn/api/v1/did",
 		verificationMethodKey: "key-1",
-		verifyProof:           false,
-		checkExpiration:       false,
-		checkRevocation:       false,
-		validateSchema:        false,
-		verifyPermissions:     true,
+		isVerifyProof:         false,
+		isCheckExpiration:     false,
+		isCheckRevocation:     false,
+		isValidateSchema:      false,
+		isVerifyPermissions:   true,
 		specification:         &defaultSpec,
 	}
 
@@ -141,7 +142,12 @@ func getVerifyOptions(opts ...VerifyOpt) *verifyOptions {
 		}
 	}
 
-	return options
+	err := options.validate()
+	if err != nil {
+		return nil, fmt.Errorf("invalid verification options: %w", err)
+	}
+
+	return options, nil
 }
 
 // Verify is the main entry point for credential verification.
@@ -168,12 +174,15 @@ func getVerifyOptions(opts ...VerifyOpt) *verifyOptions {
 //		// Handle verification error
 //	}
 //	// Use result.IssuerDID, result.HolderDID, result.Permissions
-func Verify(credential []byte, opts ...VerifyOpt) (*VerifyResult, error) {
+func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyResult, error) {
 	if len(credential) == 0 {
 		return nil, fmt.Errorf("credential is empty")
 	}
 
-	verifyOpts := getVerifyOptions(opts...)
+	verifyOpts, err := getVerifyOptions(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get verify options: %w", err)
+	}
 
 	// Convert auth SDK options to credential SDK options
 	credOpts := buildCredentialOptions(verifyOpts)
@@ -197,7 +206,7 @@ func Verify(credential []byte, opts ...VerifyOpt) (*VerifyResult, error) {
 	}
 
 	// Verify permissions if enabled
-	if verifyOpts.verifyPermissions {
+	if verifyOpts.isVerifyPermissions {
 		if err := verifyPermissions(permissions, *verifyOpts.specification); err != nil {
 			return nil, fmt.Errorf("permissions validation failed: %w", err)
 		}
@@ -240,21 +249,6 @@ func verifyPermissions(permissions []policy.Statement, spec policy.Specification
 	// Validate the policy (this checks all statements)
 	if !pol.IsValid() {
 		return fmt.Errorf("invalid permissions: one or more statements are malformed")
-	}
-
-	// Additional validation: ensure each statement has required fields
-	for i, stmt := range permissions {
-		if stmt.Effect != policy.EffectAllow && stmt.Effect != policy.EffectDeny {
-			return fmt.Errorf("permissions[%d]: invalid effect '%s'", i, stmt.Effect)
-		}
-
-		if len(stmt.Actions) == 0 {
-			return fmt.Errorf("permissions[%d]: must have at least one action", i)
-		}
-
-		if len(stmt.Resources) == 0 {
-			return fmt.Errorf("permissions[%d]: must have at least one resource", i)
-		}
 	}
 
 	return nil
@@ -321,19 +315,19 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 		credOpts = append(credOpts, vc.WithVerificationMethodKey(opts.verificationMethodKey))
 	}
 
-	if opts.validateSchema {
+	if opts.isValidateSchema {
 		credOpts = append(credOpts, vc.WithSchemaValidation())
 	}
 
-	if opts.verifyProof {
+	if opts.isVerifyProof {
 		credOpts = append(credOpts, vc.WithVerifyProof())
 	}
 
-	if opts.checkExpiration {
+	if opts.isCheckExpiration {
 		credOpts = append(credOpts, vc.WithCheckExpiration())
 	}
 
-	if opts.checkRevocation {
+	if opts.isCheckRevocation {
 		credOpts = append(credOpts, vc.WithCheckRevocation())
 	}
 

@@ -170,6 +170,10 @@ func (p Policy) AllowStatement(stmt Statement) bool {
 // IsValid checks if the policy is valid.
 // A policy is valid if all its statements are valid.
 func (p Policy) IsValid() bool {
+	if len(p.Permissions) == 0 {
+		return false
+	}
+
 	for _, stmt := range p.Permissions {
 		if !stmt.isValid(p.Specification) {
 			return false

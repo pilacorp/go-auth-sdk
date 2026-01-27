@@ -164,3 +164,40 @@ func TestPolicy_AddAllowAndAddDeny(t *testing.T) {
 		t.Errorf("denyStmt.Conditions value = %s, want %s", denyStmt.Conditions["StringNotEquals"]["issuer:created_by"], "<issuer_did>")
 	}
 }
+
+func TestPolicy_IsValid_EmptyPolicy(t *testing.T) {
+	var p Policy
+	if p.IsValid() {
+		t.Error("IsValid() for empty policy = true, want false")
+	}
+}
+
+func TestPolicy_IsValid_ValidPolicy(t *testing.T) {
+	p := NewPolicy(
+		WithStatements(
+			Statement{
+				Effect:    EffectAllow,
+				Actions:   []Action{NewAction("Issuer:Create")},
+				Resources: []Resource{NewResource(ResourceObjectIssuer)},
+			},
+		),
+	)
+	if !p.IsValid() {
+		t.Error("IsValid() for valid policy = false, want true")
+	}
+}
+
+func TestPolicy_IsValid_InvalidStatement(t *testing.T) {
+	p := NewPolicy(
+		WithStatements(
+			Statement{
+				Effect:    Effect("invalid"),
+				Actions:   []Action{NewAction("Issuer:Create")},
+				Resources: []Resource{NewResource(ResourceObjectIssuer)},
+			},
+		),
+	)
+	if p.IsValid() {
+		t.Error("IsValid() for policy with invalid statement = true, want false")
+	}
+}
