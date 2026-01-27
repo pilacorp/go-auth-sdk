@@ -34,3 +34,91 @@ func TestStatement_Helpers(t *testing.T) {
 		t.Errorf("Statement.Conditions value = %s, want %s", s.Conditions["StringNotEquals"]["issuer:created_by"], "<provider_did>")
 	}
 }
+
+func TestStatement_EmptyActions(t *testing.T) {
+	spec := DefaultSpecification()
+
+	// Statement with empty actions should be invalid
+	s := NewStatement(
+		EffectAllow,
+		[]Action{}, // Empty actions
+		[]Resource{NewResource(ResourceObjectIssuer)},
+		NewCondition(),
+	)
+
+	// Create a policy to test validation
+	p := NewPolicy(
+		WithSpecification(spec),
+		WithStatements(s),
+	)
+
+	if p.IsValid() {
+		t.Error("Statement with empty actions should be invalid")
+	}
+}
+
+func TestStatement_EmptyResources(t *testing.T) {
+	spec := DefaultSpecification()
+
+	// Statement with empty resources should be invalid
+	s := NewStatement(
+		EffectAllow,
+		[]Action{NewAction("Issuer:Create")},
+		[]Resource{}, // Empty resources
+		NewCondition(),
+	)
+
+	// Create a policy to test validation
+	p := NewPolicy(
+		WithSpecification(spec),
+		WithStatements(s),
+	)
+
+	if p.IsValid() {
+		t.Error("Statement with empty resources should be invalid")
+	}
+}
+
+func TestStatement_EmptyActionsAndResources(t *testing.T) {
+	spec := DefaultSpecification()
+
+	// Statement with both empty actions and resources should be invalid
+	s := NewStatement(
+		EffectAllow,
+		[]Action{},   // Empty actions
+		[]Resource{}, // Empty resources
+		NewCondition(),
+	)
+
+	// Create a policy to test validation
+	p := NewPolicy(
+		WithSpecification(spec),
+		WithStatements(s),
+	)
+
+	if p.IsValid() {
+		t.Error("Statement with empty actions and resources should be invalid")
+	}
+}
+
+func TestStatement_ValidWithActionsAndResources(t *testing.T) {
+	spec := DefaultSpecification()
+
+	// Statement with both actions and resources should be valid (if actions and resources are valid)
+	s := NewStatement(
+		EffectAllow,
+		[]Action{NewAction("Issuer:Create")},
+		[]Resource{NewResource(ResourceObjectIssuer)},
+		NewCondition(),
+	)
+
+	// Create a policy to test validation
+	p := NewPolicy(
+		WithSpecification(spec),
+		WithStatements(s),
+	)
+
+	if !p.IsValid() {
+		t.Error("Statement with valid actions and resources should be valid")
+	}
+}
