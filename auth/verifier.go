@@ -121,35 +121,6 @@ func WithSpecification(spec policy.Specification) VerifyOpt {
 	}
 }
 
-// getVerifyOptions returns the verification options with defaults applied.
-// It processes all provided options and returns a configured verifyOptions struct.
-func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
-	defaultSpec := policy.DefaultSpecification()
-	options := &verifyOptions{
-		didBaseURL:            "https://api.ndadid.vn/api/v1/did",
-		verificationMethodKey: "key-1",
-		isVerifyProof:         false,
-		isCheckExpiration:     false,
-		isCheckRevocation:     false,
-		isValidateSchema:      false,
-		isVerifyPermissions:   true,
-		specification:         &defaultSpec,
-	}
-
-	for _, opt := range opts {
-		if opt != nil {
-			opt(options)
-		}
-	}
-
-	err := options.validate()
-	if err != nil {
-		return nil, fmt.Errorf("invalid verification options: %w", err)
-	}
-
-	return options, nil
-}
-
 // Verify is the main entry point for credential verification.
 // It performs a comprehensive verification of a Verifiable Credential including:
 //   - Parsing the credential (supports both JWT and JSON-LD formats)
@@ -297,4 +268,33 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 	}
 
 	return credOpts
+}
+
+// getVerifyOptions returns the verification options with defaults applied.
+// It processes all provided options and returns a configured verifyOptions struct.
+func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
+	defaultSpec := policy.DefaultSpecification()
+	options := &verifyOptions{
+		didBaseURL:            "https://api.ndadid.vn/api/v1/did",
+		verificationMethodKey: "key-1",
+		isVerifyProof:         false,
+		isCheckExpiration:     false,
+		isCheckRevocation:     false,
+		isValidateSchema:      false,
+		isVerifyPermissions:   true,
+		specification:         &defaultSpec,
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(options)
+		}
+	}
+
+	err := options.validate()
+	if err != nil {
+		return nil, fmt.Errorf("invalid verification options: %w", err)
+	}
+
+	return options, nil
 }
