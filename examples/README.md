@@ -63,22 +63,16 @@ policy := policy.NewPolicy(
     ),
 )
 
-// Build credential
-builder, _ := auth.NewAuthBuilder(
-    auth.AuthData{
-        IssuerDID: "did:example:issuer",
-        SchemaID:  "https://example.com/schema/v1",
-    },
-    ecdsaSigner,
-)
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, _ := builder.Build(context.Background(), auth.AuthData{
+result, _ := auth.Build(context.Background(), auth.AuthData{
+    IssuerDID:  "did:example:issuer",
+    SchemaID:   "https://example.com/schema/v1",
     HolderDID:  "did:example:holder",
     Policy:     policy,
     ValidFrom:  &validFrom,
     ValidUntil: &validUntil,
-}, signer.WithPrivateKey(privateKeyBytes))
+}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 ```
 
 ### Verifying a Credential

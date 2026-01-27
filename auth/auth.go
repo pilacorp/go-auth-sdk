@@ -14,38 +14,27 @@ import (
 	"fmt"
 
 	"github.com/pilacorp/go-auth-sdk/signer"
+	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-// AuthBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
-type AuthBuilder struct {
-	DefaultAuthData AuthData
-	Signer          signer.Signer
-}
-
-// NewAuthBuilder creates a new reusable AuthBuilder.
-func NewAuthBuilder(defaultAuthData AuthData, signer signer.Signer) (*AuthBuilder, error) {
-	return &AuthBuilder{
-		DefaultAuthData: defaultAuthData,
-		Signer:          signer,
-	}, nil
-}
-
 // Build creates the VC-JWT payload and optionally signs it if a signer is available.
-func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.SignOption) (*AuthResponse, error) {
-	// Merge DefaultAuthData with data, where data takes precedence
-	mergedData := b.mergeAuthData(data)
-	if err := validateAuthData(mergedData); err != nil {
-		return nil, err
+func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...signer.SignOption) (*AuthResponse, error) {
+	// If signer is not provided, use ECDSA signer
+	if signer == nil {
+		signer = ecdsa.NewPrivSigner()
 	}
 
+	if err := validateAuthData(data); err != nil {
+		return nil, err
+	}
 	// Build credential subject with permissions
 	// vc.Subject has ID and CustomFields
 	customFields := make(map[string]any)
-	customFields["permissions"] = mergedData.Policy.Permissions
+	customFields["permissions"] = data.Policy.Permissions
 	subject := vc.Subject{
-		ID:           mergedData.HolderDID,
+		ID:           data.HolderDID,
 		CustomFields: customFields,
 	}
 
@@ -59,22 +48,22 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 		},
 		Schemas: []vc.Schema{
 			{
-				ID:   mergedData.SchemaID,
+				ID:   data.SchemaID,
 				Type: "JsonSchema",
 			},
 		},
-		Issuer:           mergedData.IssuerDID,
+		Issuer:           data.IssuerDID,
 		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject:          subjects,
-		CredentialStatus: mergedData.CredentialStatus,
+		CredentialStatus: data.CredentialStatus,
 	}
 
 	// Add validity period if provided
-	if mergedData.ValidFrom != nil {
-		vcContents.ValidFrom = *mergedData.ValidFrom
+	if data.ValidFrom != nil {
+		vcContents.ValidFrom = *data.ValidFrom
 	}
-	if mergedData.ValidUntil != nil {
-		vcContents.ValidUntil = *mergedData.ValidUntil
+	if data.ValidUntil != nil {
+		vcContents.ValidUntil = *data.ValidUntil
 	}
 
 	// Create JWT credential
@@ -94,7 +83,7 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 	hash := sha256.Sum256(signData)
 
 	// Sign the credential
-	signature, err := b.Signer.Sign(ctx, hash[:], opts...)
+	signature, err := signer.Sign(ctx, hash[:], opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign credential: %w", err)
 	}
@@ -121,30 +110,6 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 	return &AuthResponse{
 		Token: string(documentBytes),
 	}, nil
-}
-
-// mergeAuthData merges DefaultAuthData with the provided data, where data takes precedence.
-func (b *AuthBuilder) mergeAuthData(data AuthData) AuthData {
-	merged := b.DefaultAuthData
-	if data.SchemaID != "" {
-		merged.SchemaID = data.SchemaID
-	}
-	if data.IssuerDID != "" {
-		merged.IssuerDID = data.IssuerDID
-	}
-	if data.HolderDID != "" {
-		merged.HolderDID = data.HolderDID
-	}
-	if !data.Policy.IsEmpty() {
-		merged.Policy = data.Policy
-	}
-	if data.ValidFrom != nil {
-		merged.ValidFrom = data.ValidFrom
-	}
-	if data.ValidUntil != nil {
-		merged.ValidUntil = data.ValidUntil
-	}
-	return merged
 }
 
 // validateAuthData validates that the required fields in AuthData are present.

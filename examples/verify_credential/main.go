@@ -40,27 +40,19 @@ func main() {
 		),
 	)
 
-	// Step 4: Create AuthBuilder
-	builder, err := auth.NewAuthBuilder(
-		auth.AuthData{
-			IssuerDID: "did:example:issuer",
-			SchemaID:  "https://example.com/schema/v1",
-		},
-		ecdsaSigner,
-	)
-	if err != nil {
-		log.Fatalf("Failed to create AuthBuilder: %v", err)
-	}
-
-	// Step 5: Build credential
+	// Step 4: Build credential
+	issuerDID := "did:example:issuer"
+	schemaID := "https://example.com/schema/v1"
 	validFrom := time.Now()
 	validUntil := time.Now().Add(24 * time.Hour)
-	result, err := builder.Build(ctx, auth.AuthData{
+	result, err := auth.Build(ctx, auth.AuthData{
+		IssuerDID:  issuerDID,
+		SchemaID:   schemaID,
 		HolderDID:  "did:example:holder",
 		Policy:     policy,
 		ValidFrom:  &validFrom,
 		ValidUntil: &validUntil,
-	}, signer.WithPrivateKey(privateKeyBytes))
+	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 	if err != nil {
 		log.Fatalf("Failed to build credential: %v", err)
 	}
