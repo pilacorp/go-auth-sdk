@@ -62,8 +62,10 @@ func TestAuthBuilder_Build(t *testing.T) {
 
 	// Build credential with all options
 	builder, err := NewAuthBuilder(
-		issuerDID,
-		schemaID,
+		AuthData{
+			IssuerDID: issuerDID,
+			SchemaID:  schemaID,
+		},
 		ecdsaSigner,
 	)
 	if err != nil {
@@ -101,38 +103,22 @@ func TestAuthBuilder_Build(t *testing.T) {
 	t.Logf("Credential: %s", result.Token)
 }
 
-func TestNewAuthBuilder_EmptyIssuerDID(t *testing.T) {
-	ecdsaSigner := ecdsa.NewPrivSigner()
-	_, err := NewAuthBuilder("", "https://example.com/schema/v1", ecdsaSigner)
-	if err == nil {
-		t.Error("NewAuthBuilder() should return error for empty issuerDID")
-	}
-	if err.Error() != "issuer DID is required" {
-		t.Errorf("NewAuthBuilder() error = %v, want 'issuer DID is required'", err)
-	}
-}
-
-func TestNewAuthBuilder_EmptySchemaID(t *testing.T) {
-	ecdsaSigner := ecdsa.NewPrivSigner()
-	_, err := NewAuthBuilder("did:example:issuer", "", ecdsaSigner)
-	if err == nil {
-		t.Error("NewAuthBuilder() should return error for empty schemaID")
-	}
-	if err.Error() != "schema ID is required" {
-		t.Errorf("NewAuthBuilder() error = %v, want 'schema ID is required'", err)
-	}
-}
-
 func TestNewAuthBuilder_NilSigner(t *testing.T) {
-	builder, err := NewAuthBuilder("did:example:issuer", "https://example.com/schema/v1", nil)
+	builder, err := NewAuthBuilder(
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
+		nil,
+	)
 	if err != nil {
-		t.Fatalf("NewAuthBuilder() with nil signer should use default: %v", err)
+		t.Fatalf("NewAuthBuilder() with nil signer should succeed: %v", err)
 	}
 	if builder == nil {
 		t.Fatal("NewAuthBuilder() should return builder when signer is nil")
 	}
-	if builder.Signer == nil {
-		t.Error("NewAuthBuilder() should set default signer when nil is provided")
+	if builder.Signer != nil {
+		t.Error("NewAuthBuilder() should allow nil signer")
 	}
 }
 
@@ -143,8 +129,10 @@ func TestAuthBuilder_Build_EmptyPolicy(t *testing.T) {
 	ecdsaSigner := ecdsa.NewPrivSigner()
 
 	builder, err := NewAuthBuilder(
-		"did:example:issuer",
-		"https://example.com/schema/v1",
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
 		ecdsaSigner,
 	)
 	if err != nil {
@@ -186,8 +174,10 @@ func TestAuthBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 	)
 
 	builder, err := NewAuthBuilder(
-		"did:example:issuer",
-		"https://example.com/schema/v1",
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
 		ecdsaSigner,
 	)
 	if err != nil {
@@ -230,8 +220,10 @@ func TestAuthBuilder_Build_OnlyValidFrom(t *testing.T) {
 	)
 
 	builder, err := NewAuthBuilder(
-		"did:example:issuer",
-		"https://example.com/schema/v1",
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
 		ecdsaSigner,
 	)
 	if err != nil {
@@ -261,8 +253,10 @@ func TestAuthBuilder_Build_MultipleCredentials(t *testing.T) {
 
 	// Create builder once
 	builder, err := NewAuthBuilder(
-		"did:example:issuer",
-		"https://example.com/schema/v1",
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
 		ecdsaSigner,
 	)
 	if err != nil {
@@ -316,8 +310,10 @@ func TestAuthBuilder_Build_InvalidPrivateKey(t *testing.T) {
 	)
 
 	builder, err := NewAuthBuilder(
-		"did:example:issuer",
-		"https://example.com/schema/v1",
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
 		ecdsaSigner,
 	)
 	if err != nil {
@@ -358,8 +354,10 @@ func TestAuthBuilder_Build_EmptyHolderDID(t *testing.T) {
 	)
 
 	builder, err := NewAuthBuilder(
-		"did:example:issuer",
-		"https://example.com/schema/v1",
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
 		ecdsaSigner,
 	)
 	if err != nil {
@@ -450,8 +448,10 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 
 	// Create builder with Vault signer
 	builder, err := NewAuthBuilder(
-		"did:example:issuer",
-		"https://example.com/schema/v1",
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
 		vaultSigner,
 	)
 	if err != nil {
@@ -504,8 +504,10 @@ func TestAuthBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
 	vaultSigner := vault.NewVaultSigner(server.URL, "test-vault-token")
 
 	builder, err := NewAuthBuilder(
-		"did:example:issuer",
-		"https://example.com/schema/v1",
+		AuthData{
+			IssuerDID: "did:example:issuer",
+			SchemaID:  "https://example.com/schema/v1",
+		},
 		vaultSigner,
 	)
 	if err != nil {
@@ -524,5 +526,90 @@ func TestAuthBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
 	}
 	if result != nil {
 		t.Error("Build() should return nil result when signing fails")
+	}
+}
+
+func TestAuthBuilder_Build_MergeDefaults(t *testing.T) {
+	ctx := context.Background()
+	privateKey, _ := crypto.GenerateKey()
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	ecdsaSigner := ecdsa.NewPrivSigner()
+
+	defaultIssuerDID := "did:example:default-issuer"
+	defaultSchemaID := "https://example.com/default-schema/v1"
+	defaultPolicy := policy.NewPolicy(
+		policy.WithStatements(
+			policy.NewStatement(
+				policy.EffectAllow,
+				[]policy.Action{policy.NewAction("Credential:Read")},
+				[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+				policy.NewCondition(),
+			),
+		),
+	)
+
+	// Create builder with default values
+	builder, err := NewAuthBuilder(
+		AuthData{
+			IssuerDID: defaultIssuerDID,
+			SchemaID:  defaultSchemaID,
+			Policy:    defaultPolicy,
+		},
+		ecdsaSigner,
+	)
+	if err != nil {
+		t.Fatalf("Failed to create builder: %v", err)
+	}
+
+	// Test 1: Data should override defaults
+	overrideIssuerDID := "did:example:override-issuer"
+	overrideSchemaID := "https://example.com/override-schema/v1"
+	overridePolicy := policy.NewPolicy(
+		policy.WithStatements(
+			policy.NewStatement(
+				policy.EffectAllow,
+				[]policy.Action{policy.NewAction("Credential:Create")},
+				[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+				policy.NewCondition(),
+			),
+		),
+	)
+
+	result, err := builder.Build(ctx, AuthData{
+		HolderDID: "did:example:holder",
+		IssuerDID: overrideIssuerDID,
+		SchemaID:  overrideSchemaID,
+		Policy:    overridePolicy,
+	}, signer.WithPrivateKey(privateKeyBytes))
+	if err != nil {
+		t.Fatalf("Build() with overrides should succeed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Build() should return result")
+	}
+
+	// Test 2: Empty data should use defaults
+	result2, err := builder.Build(ctx, AuthData{
+		HolderDID: "did:example:holder2",
+		// IssuerDID, SchemaID, and Policy are empty, should use defaults
+	}, signer.WithPrivateKey(privateKeyBytes))
+	if err != nil {
+		t.Fatalf("Build() with defaults should succeed: %v", err)
+	}
+	if result2 == nil {
+		t.Fatal("Build() should return result with defaults")
+	}
+
+	// Test 3: Partial override - only HolderDID provided, rest should use defaults
+	result3, err := builder.Build(ctx, AuthData{
+		HolderDID: "did:example:holder3",
+		// SchemaID and Policy empty, should use defaults
+		IssuerDID: "", // Empty string should not override default
+	}, signer.WithPrivateKey(privateKeyBytes))
+	if err != nil {
+		t.Fatalf("Build() with partial data should succeed: %v", err)
+	}
+	if result3 == nil {
+		t.Fatal("Build() should return result with partial data")
 	}
 }

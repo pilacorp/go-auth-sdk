@@ -14,53 +14,38 @@ import (
 	"fmt"
 
 	"github.com/pilacorp/go-auth-sdk/signer"
-	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
 // AuthBuilder builds Verifiable Credentials (VC-JWT) with embedded permission policies.
 type AuthBuilder struct {
-	IssuerDID string
-	SchemaID  string
-	Signer    signer.Signer
+	DefaultAuthData AuthData
+	Signer          signer.Signer
 }
 
 // NewAuthBuilder creates a new reusable AuthBuilder.
-func NewAuthBuilder(issuerDID, schemaID string, signer signer.Signer) (*AuthBuilder, error) {
-	if issuerDID == "" {
-		return nil, fmt.Errorf("issuer DID is required")
-	}
-	if schemaID == "" {
-		return nil, fmt.Errorf("schema ID is required")
-	}
-
-	// If no signer is provided, use the default private key signer
-	if signer == nil {
-		signer = ecdsa.NewPrivSigner()
-	}
-
+func NewAuthBuilder(defaultAuthData AuthData, signer signer.Signer) (*AuthBuilder, error) {
 	return &AuthBuilder{
-		IssuerDID: issuerDID,
-		SchemaID:  schemaID,
-		Signer:    signer,
+		DefaultAuthData: defaultAuthData,
+		Signer:          signer,
 	}, nil
 }
 
 // Build creates the VC-JWT payload and optionally signs it if a signer is available.
 func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.SignOption) (*AuthResponse, error) {
-	// Holder DID is required
-	if data.HolderDID == "" {
-		return nil, fmt.Errorf("holder DID is required")
+	// Merge DefaultAuthData with data, where data takes precedence
+	mergedData := b.mergeAuthData(data)
+	if err := validateAuthData(mergedData); err != nil {
+		return nil, err
 	}
 
 	// Build credential subject with permissions
 	// vc.Subject has ID and CustomFields
 	customFields := make(map[string]any)
-	customFields["permissions"] = data.Policy.Permissions
-
+	customFields["permissions"] = mergedData.Policy.Permissions
 	subject := vc.Subject{
-		ID:           data.HolderDID,
+		ID:           mergedData.HolderDID,
 		CustomFields: customFields,
 	}
 
@@ -74,22 +59,22 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 		},
 		Schemas: []vc.Schema{
 			{
-				ID:   b.SchemaID,
+				ID:   mergedData.SchemaID,
 				Type: "JsonSchema",
 			},
 		},
-		Issuer:           b.IssuerDID,
+		Issuer:           mergedData.IssuerDID,
 		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject:          subjects,
-		CredentialStatus: data.CredentialStatus,
+		CredentialStatus: mergedData.CredentialStatus,
 	}
 
 	// Add validity period if provided
-	if data.ValidFrom != nil {
-		vcContents.ValidFrom = *data.ValidFrom
+	if mergedData.ValidFrom != nil {
+		vcContents.ValidFrom = *mergedData.ValidFrom
 	}
-	if data.ValidUntil != nil {
-		vcContents.ValidUntil = *data.ValidUntil
+	if mergedData.ValidUntil != nil {
+		vcContents.ValidUntil = *mergedData.ValidUntil
 	}
 
 	// Create JWT credential
@@ -136,4 +121,45 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...signer.S
 	return &AuthResponse{
 		Token: string(documentBytes),
 	}, nil
+}
+
+// mergeAuthData merges DefaultAuthData with the provided data, where data takes precedence.
+func (b *AuthBuilder) mergeAuthData(data AuthData) AuthData {
+	merged := b.DefaultAuthData
+	if data.SchemaID != "" {
+		merged.SchemaID = data.SchemaID
+	}
+	if data.IssuerDID != "" {
+		merged.IssuerDID = data.IssuerDID
+	}
+	if data.HolderDID != "" {
+		merged.HolderDID = data.HolderDID
+	}
+	if !data.Policy.IsEmpty() {
+		merged.Policy = data.Policy
+	}
+	if data.ValidFrom != nil {
+		merged.ValidFrom = data.ValidFrom
+	}
+	if data.ValidUntil != nil {
+		merged.ValidUntil = data.ValidUntil
+	}
+	return merged
+}
+
+// validateAuthData validates that the required fields in AuthData are present.
+func validateAuthData(data AuthData) error {
+	if data.SchemaID == "" {
+		return fmt.Errorf("schema ID is required")
+	}
+
+	if data.IssuerDID == "" {
+		return fmt.Errorf("issuer DID is required")
+	}
+
+	if data.HolderDID == "" {
+		return fmt.Errorf("holder DID is required")
+	}
+
+	return nil
 }

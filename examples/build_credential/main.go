@@ -69,8 +69,10 @@ func main() {
 	issuerDID := "did:example:issuer"
 	schemaID := "https://example.com/schema/v1"
 	builder, err := auth.NewAuthBuilder(
-		issuerDID,
-		schemaID,
+		auth.AuthData{
+			IssuerDID: issuerDID,
+			SchemaID:  schemaID,
+		},
 		ecdsaSigner,
 	)
 	if err != nil {

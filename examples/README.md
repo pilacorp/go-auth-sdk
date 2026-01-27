@@ -64,7 +64,13 @@ policy := policy.NewPolicy(
 )
 
 // Build credential
-builder, _ := auth.NewAuthBuilder("did:example:issuer", "https://example.com/schema/v1", ecdsaSigner)
+builder, _ := auth.NewAuthBuilder(
+    auth.AuthData{
+        IssuerDID: "did:example:issuer",
+        SchemaID:  "https://example.com/schema/v1",
+    },
+    ecdsaSigner,
+)
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
 result, _ := builder.Build(context.Background(), auth.AuthData{

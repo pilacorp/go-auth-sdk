@@ -10,6 +10,8 @@ import (
 
 // AuthData holds the authentication-specific data.
 type AuthData struct {
+	IssuerDID        string
+	SchemaID         string
 	HolderDID        string
 	Policy           policy.Policy
 	ValidFrom        *time.Time
