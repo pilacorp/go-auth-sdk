@@ -73,20 +73,20 @@ func TestVerifyPermissions_ValidPermissions(t *testing.T) {
 	}
 
 	spec := policy.DefaultSpecification()
-	err := verifyPermissions(permissions, spec)
+	err := policy.ValidateStatements(permissions, spec)
 	if err != nil {
-		t.Errorf("VerifyPermissions() error = %v, want nil", err)
+		t.Errorf("ValidateStatements() error = %v, want nil", err)
 	}
 }
 
 func TestVerifyPermissions_EmptyPermissions(t *testing.T) {
 	spec := policy.DefaultSpecification()
-	err := verifyPermissions([]policy.Statement{}, spec)
+	err := policy.ValidateStatements([]policy.Statement{}, spec)
 	if err == nil {
-		t.Error("VerifyPermissions() should return error for empty permissions")
+		t.Error("ValidateStatements() should return error for empty permissions")
 	}
-	if err.Error() != "permissions list cannot be empty" {
-		t.Errorf("VerifyPermissions() error = %v, want 'permissions list cannot be empty'", err)
+	if err.Error() != "statements list cannot be empty" {
+		t.Errorf("ValidateStatements() error = %v, want 'statements list cannot be empty'", err)
 	}
 }
 
@@ -100,9 +100,9 @@ func TestVerifyPermissions_InvalidEffect(t *testing.T) {
 	}
 
 	spec := policy.DefaultSpecification()
-	err := verifyPermissions(permissions, spec)
+	err := policy.ValidateStatements(permissions, spec)
 	if err == nil {
-		t.Error("VerifyPermissions() should return error for invalid effect")
+		t.Error("ValidateStatements() should return error for invalid effect")
 	}
 }
 
@@ -116,9 +116,9 @@ func TestVerifyPermissions_NoActions(t *testing.T) {
 	}
 
 	spec := policy.DefaultSpecification()
-	err := verifyPermissions(permissions, spec)
+	err := policy.ValidateStatements(permissions, spec)
 	if err == nil {
-		t.Error("VerifyPermissions() should return error when statement has no actions")
+		t.Error("ValidateStatements() should return error when statement has no actions")
 	}
 }
 
@@ -132,9 +132,9 @@ func TestVerifyPermissions_NoResources(t *testing.T) {
 	}
 
 	spec := policy.DefaultSpecification()
-	err := verifyPermissions(permissions, spec)
+	err := policy.ValidateStatements(permissions, spec)
 	if err == nil {
-		t.Error("VerifyPermissions() should return error when statement has no resources")
+		t.Error("ValidateStatements() should return error when statement has no resources")
 	}
 }
 
@@ -148,9 +148,9 @@ func TestVerifyPermissions_InvalidAction(t *testing.T) {
 	}
 
 	spec := policy.DefaultSpecification()
-	err := verifyPermissions(permissions, spec)
+	err := policy.ValidateStatements(permissions, spec)
 	if err == nil {
-		t.Error("VerifyPermissions() should return error for invalid action")
+		t.Error("ValidateStatements() should return error for invalid action")
 	}
 }
 
@@ -164,9 +164,9 @@ func TestVerifyPermissions_InvalidResource(t *testing.T) {
 	}
 
 	spec := policy.DefaultSpecification()
-	err := verifyPermissions(permissions, spec)
+	err := policy.ValidateStatements(permissions, spec)
 	if err == nil {
-		t.Error("VerifyPermissions() should return error for invalid resource")
+		t.Error("ValidateStatements() should return error for invalid resource")
 	}
 }
 
@@ -187,9 +187,9 @@ func TestVerifyPermissions_WithCustomSpecification(t *testing.T) {
 		},
 	}
 
-	err := verifyPermissions(validPermissions, customSpec)
+	err := policy.ValidateStatements(validPermissions, customSpec)
 	if err != nil {
-		t.Errorf("VerifyPermissions() with custom spec error = %v, want nil", err)
+		t.Errorf("ValidateStatements() with custom spec error = %v, want nil", err)
 	}
 
 	// Invalid permissions (action not in custom spec)
@@ -201,7 +201,7 @@ func TestVerifyPermissions_WithCustomSpecification(t *testing.T) {
 		},
 	}
 
-	err = verifyPermissions(invalidPermissions, customSpec)
+	err = policy.ValidateStatements(invalidPermissions, customSpec)
 	if err == nil {
 		t.Error("VerifyPermissions() should return error for action not in custom specification")
 	}

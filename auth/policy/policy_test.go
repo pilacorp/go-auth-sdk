@@ -201,3 +201,183 @@ func TestPolicy_IsValid_InvalidStatement(t *testing.T) {
 		t.Error("IsValid() for policy with invalid statement = true, want false")
 	}
 }
+
+func TestValidateStatements_EmptyStatements(t *testing.T) {
+	spec := DefaultSpecification()
+	err := ValidateStatements([]Statement{}, spec)
+	if err == nil {
+		t.Error("ValidateStatements() with empty statements should return error")
+	}
+	if err.Error() != "statements list cannot be empty" {
+		t.Errorf("ValidateStatements() error = %v, want 'statements list cannot be empty'", err)
+	}
+}
+
+func TestValidateStatements_ValidStatements(t *testing.T) {
+	spec := DefaultSpecification()
+	statements := []Statement{
+		{
+			Effect:    EffectAllow,
+			Actions:   []Action{NewAction("Issuer:Create")},
+			Resources: []Resource{NewResource(ResourceObjectIssuer)},
+		},
+	}
+
+	err := ValidateStatements(statements, spec)
+	if err != nil {
+		t.Errorf("ValidateStatements() with valid statements error = %v, want nil", err)
+	}
+}
+
+func TestValidateStatements_ValidMultipleStatements(t *testing.T) {
+	spec := DefaultSpecification()
+	statements := []Statement{
+		{
+			Effect:    EffectAllow,
+			Actions:   []Action{NewAction("Issuer:Create"), NewAction("Issuer:Update")},
+			Resources: []Resource{NewResource(ResourceObjectIssuer)},
+		},
+		{
+			Effect:    EffectDeny,
+			Actions:   []Action{NewAction("Issuer:Delete")},
+			Resources: []Resource{NewResource(ResourceObjectIssuer)},
+		},
+	}
+
+	err := ValidateStatements(statements, spec)
+	if err != nil {
+		t.Errorf("ValidateStatements() with valid multiple statements error = %v, want nil", err)
+	}
+}
+
+func TestValidateStatements_WithCustomSpecification(t *testing.T) {
+	// Create a custom specification with only Issuer actions and resources
+	customSpec := NewSpecification(
+		[]ActionObject{ActionObjectIssuer},
+		[]ActionVerb{ActionVerbCreate, ActionVerbDelete},
+		[]ResourceObject{ResourceObjectIssuer},
+	)
+
+	// Valid statements for custom spec
+	validStatements := []Statement{
+		{
+			Effect:    EffectAllow,
+			Actions:   []Action{NewAction("Issuer:Create")},
+			Resources: []Resource{NewResource(ResourceObjectIssuer)},
+		},
+	}
+
+	err := ValidateStatements(validStatements, customSpec)
+	if err != nil {
+		t.Errorf("ValidateStatements() with custom spec and valid statements error = %v, want nil", err)
+	}
+
+	// Invalid statements (action not in custom spec)
+	invalidStatements := []Statement{
+		{
+			Effect:    EffectAllow,
+			Actions:   []Action{NewAction("Did:Create")},
+			Resources: []Resource{NewResource(ResourceObjectIssuer)},
+		},
+	}
+
+	err = ValidateStatements(invalidStatements, customSpec)
+	if err == nil {
+		t.Error("ValidateStatements() with action not in custom specification should return error")
+	}
+}
+
+func TestValidateStatements_EmptyActions(t *testing.T) {
+	spec := DefaultSpecification()
+	statements := []Statement{
+		{
+			Effect:    EffectAllow,
+			Actions:   []Action{},
+			Resources: []Resource{NewResource(ResourceObjectIssuer)},
+		},
+	}
+
+	err := ValidateStatements(statements, spec)
+	if err == nil {
+		t.Error("ValidateStatements() with empty actions should return error")
+	}
+	if err.Error() != "invalid statements: one or more statements are malformed" {
+		t.Errorf("ValidateStatements() error = %v, want 'invalid statements: one or more statements are malformed'", err)
+	}
+}
+
+func TestValidateStatements_EmptyResources(t *testing.T) {
+	spec := DefaultSpecification()
+	statements := []Statement{
+		{
+			Effect:    EffectAllow,
+			Actions:   []Action{NewAction("Issuer:Create")},
+			Resources: []Resource{},
+		},
+	}
+
+	err := ValidateStatements(statements, spec)
+	if err == nil {
+		t.Error("ValidateStatements() with empty resources should return error")
+	}
+	if err.Error() != "invalid statements: one or more statements are malformed" {
+		t.Errorf("ValidateStatements() error = %v, want 'invalid statements: one or more statements are malformed'", err)
+	}
+}
+
+func TestValidateStatements_InvalidEffect(t *testing.T) {
+	spec := DefaultSpecification()
+	statements := []Statement{
+		{
+			Effect:    Effect("invalid"),
+			Actions:   []Action{NewAction("Issuer:Create")},
+			Resources: []Resource{NewResource(ResourceObjectIssuer)},
+		},
+	}
+
+	err := ValidateStatements(statements, spec)
+	if err == nil {
+		t.Error("ValidateStatements() with invalid effect should return error")
+	}
+	if err.Error() != "invalid statements: one or more statements are malformed" {
+		t.Errorf("ValidateStatements() error = %v, want 'invalid statements: one or more statements are malformed'", err)
+	}
+}
+
+func TestValidateStatements_InvalidAction(t *testing.T) {
+	spec := DefaultSpecification()
+	statements := []Statement{
+		{
+			Effect:    EffectAllow,
+			Actions:   []Action{NewAction("Invalid:Action")},
+			Resources: []Resource{NewResource(ResourceObjectIssuer)},
+		},
+	}
+
+	err := ValidateStatements(statements, spec)
+	if err == nil {
+		t.Error("ValidateStatements() with invalid action should return error")
+	}
+	if err.Error() != "invalid statements: one or more statements are malformed" {
+		t.Errorf("ValidateStatements() error = %v, want 'invalid statements: one or more statements are malformed'", err)
+	}
+}
+
+func TestValidateStatements_InvalidResource(t *testing.T) {
+	spec := DefaultSpecification()
+	statements := []Statement{
+		{
+			Effect:    EffectAllow,
+			Actions:   []Action{NewAction("Issuer:Create")},
+			Resources: []Resource{NewResource("InvalidResource")},
+		},
+	}
+
+	err := ValidateStatements(statements, spec)
+	if err == nil {
+		t.Error("ValidateStatements() with invalid resource should return error")
+	}
+	if err.Error() != "invalid statements: one or more statements are malformed" {
+		t.Errorf("ValidateStatements() error = %v, want 'invalid statements: one or more statements are malformed'", err)
+	}
+}

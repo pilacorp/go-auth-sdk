@@ -207,7 +207,7 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyR
 
 	// Verify permissions if enabled
 	if verifyOpts.isVerifyPermissions {
-		if err := verifyPermissions(permissions, *verifyOpts.specification); err != nil {
+		if err := policy.ValidateStatements(permissions, *verifyOpts.specification); err != nil {
 			return nil, fmt.Errorf("permissions validation failed: %w", err)
 		}
 	}
@@ -217,41 +217,6 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyR
 		HolderDID:   holderDID,
 		Permissions: permissions,
 	}, nil
-}
-
-// verifyPermissions validates that the permissions list is well-formed.
-// It performs comprehensive validation of policy statements to ensure they
-// conform to the provided policy specification.
-//
-// Validation checks:
-//   - The permissions list is not empty
-//   - Each statement has a valid effect (EffectAllow or EffectDeny)
-//   - Each statement has at least one action
-//   - Each statement has at least one resource
-//   - All actions are valid according to the provided policy specification
-//   - All resources are valid according to the provided policy specification
-//
-// If no specification is provided, DefaultSpecification() is used.
-//
-// Returns an error if any validation check fails, with details about
-// which statement and field caused the failure.
-func verifyPermissions(permissions []policy.Statement, spec policy.Specification) error {
-	if len(permissions) == 0 {
-		return fmt.Errorf("permissions list cannot be empty")
-	}
-
-	// Create a policy with the provided specification to validate statements
-	pol := policy.NewPolicy(
-		policy.WithSpecification(spec),
-		policy.WithStatements(permissions...),
-	)
-
-	// Validate the policy (this checks all statements)
-	if !pol.IsValid() {
-		return fmt.Errorf("invalid permissions: one or more statements are malformed")
-	}
-
-	return nil
 }
 
 // extractCredentialData extracts issuer DID, holder DID, and permissions from credential data.
