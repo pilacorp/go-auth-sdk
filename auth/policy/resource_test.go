@@ -105,3 +105,19 @@ func TestAnyResourceMatches(t *testing.T) {
 		t.Errorf("AnyResourceMatches unexpectedly matched target schema:1")
 	}
 }
+
+func TestResource_isValid_WithWildcardObject(t *testing.T) {
+	spec := DefaultSpecification()
+
+	// "Iss*" should be considered valid because it matches "Issuer"
+	r := Resource("Iss*:did:123")
+	if !r.isValid(spec) {
+		t.Errorf("isValid() for wildcard object Iss* = false, want true")
+	}
+
+	// Completely unknown object should still be invalid
+	rInvalid := Resource("Unknown*:x")
+	if rInvalid.isValid(spec) {
+		t.Errorf("isValid() for Unknown* = true, want false")
+	}
+}

@@ -81,3 +81,19 @@ func TestAnyActionMatches(t *testing.T) {
 		t.Errorf("AnyActionMatches unexpectedly matched schema:create")
 	}
 }
+
+func TestAction_isValidObject_WithWildcardObject(t *testing.T) {
+	spec := DefaultSpecification()
+
+	// "Iss*" should be considered valid because it matches "Issuer"
+	a := NewAction("Iss*:Create")
+	if !a.isValidObject(spec) {
+		t.Errorf("isValidObject() for wildcard object Iss* = false, want true")
+	}
+
+	// Completely unknown object should still be invalid
+	aInvalid := NewAction("Unknown*:Create")
+	if aInvalid.isValidObject(spec) {
+		t.Errorf("isValidObject() for Unknown* = true, want false")
+	}
+}
