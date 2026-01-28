@@ -31,7 +31,10 @@
 //	)
 package policy
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // PolicyOption configures a Policy during construction.
 type PolicyOption func(*Policy)
@@ -215,6 +218,31 @@ func ValidateStatements(statements []Statement, spec Specification) error {
 	}
 
 	return nil
+}
+
+// ToJSON marshals the policy into its JSON representation.
+func (p Policy) ToJSON() ([]byte, error) {
+	return json.Marshal(p)
+}
+
+// String returns the policy as a JSON string.
+func (p Policy) String() string {
+	data, _ := p.ToJSON()
+	return string(data)
+}
+
+// PolicyFromJSON unmarshals a policy from raw JSON bytes.
+func PolicyFromJSON(data []byte) (Policy, error) {
+	var p Policy
+	if err := json.Unmarshal(data, &p); err != nil {
+		return Policy{}, err
+	}
+	return p, nil
+}
+
+// PolicyFromJSONString unmarshals a policy from a JSON string.
+func PolicyFromJSONString(s string) (Policy, error) {
+	return PolicyFromJSON([]byte(s))
 }
 
 // matchObject checks if the action object matches the resource object.
