@@ -27,7 +27,7 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 		signer = ecdsa.NewPrivSigner()
 	}
 
-	if err := validateAuthData(&data); err != nil {
+	if err := validateAuthData(data); err != nil {
 		return nil, err
 	}
 	// Build credential subject with permissions
@@ -41,6 +41,9 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 
 	// Build credential contents
 	subjects := []vc.Subject{subject}
+	if data.ID == "" {
+		data.ID = uuid.NewString()
+	}
 
 	vcContents := vc.CredentialContents{
 		Context: []any{
@@ -115,11 +118,7 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 }
 
 // validateAuthData validates that the required fields in AuthData are present.
-func validateAuthData(data *AuthData) error {
-	if data.ID == "" {
-		data.ID = uuid.NewString()
-	}
-
+func validateAuthData(data AuthData) error {
 	if data.SchemaID == "" {
 		return fmt.Errorf("schema ID is required")
 	}
