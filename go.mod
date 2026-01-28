@@ -1,6 +1,6 @@
 module github.com/pilacorp/go-auth-sdk
 
-go 1.25.1
+go 1.24.6
 
 require (
 	github.com/ethereum/go-ethereum v1.16.8
