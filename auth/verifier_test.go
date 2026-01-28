@@ -495,8 +495,8 @@ func TestVerifyOptions_WithSchemaID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
-	if opts.expectedSchemaID != "https://example.com/schema" {
-		t.Errorf("WithSchemaID() expectedSchemaID = %v, want 'https://example.com/schema'", opts.expectedSchemaID)
+	if opts.schemaID != "https://example.com/schema" {
+		t.Errorf("WithSchemaID() schemaID = %v, want 'https://example.com/schema'", opts.schemaID)
 	}
 }
 

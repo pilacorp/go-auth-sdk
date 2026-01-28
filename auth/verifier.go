@@ -27,7 +27,7 @@ type verifyOptions struct {
 	// Auth SDK specific options
 	isVerifyPermissions bool
 	specification       *policy.Specification
-	expectedSchemaID    string
+	schemaID            string
 }
 
 func (o *verifyOptions) validate() error {
@@ -125,7 +125,7 @@ func WithSpecification(spec policy.Specification) VerifyOpt {
 // WithSchemaID expects the credential's schema ID to equal the given value.
 func WithSchemaID(schemaID string) VerifyOpt {
 	return func(o *verifyOptions) {
-		o.expectedSchemaID = schemaID
+		o.schemaID = schemaID
 	}
 }
 
@@ -185,8 +185,8 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyR
 	}
 
 	// Verify schema ID if expected
-	if verifyOpts.expectedSchemaID != "" {
-		if schemaID != verifyOpts.expectedSchemaID {
+	if verifyOpts.schemaID != "" {
+		if schemaID != verifyOpts.schemaID {
 			return nil, fmt.Errorf("credential schema ID does not match expected value")
 		}
 	}
@@ -237,10 +237,11 @@ func extractCredentialData(credData []byte) (issuerDID, holderDID string, schema
 	}
 	holderDID = cred.CredentialSubject.ID
 
-	// Extract schema ID if schema id is provided
-	if cred.CredentialSchema.ID != "" {
-		schemaID = cred.CredentialSchema.ID
+	// Validate schema ID
+	if cred.CredentialSchema.ID == "" {
+		return "", "", "", nil, fmt.Errorf("credentialSchema.id must be a non-empty string")
 	}
+	schemaID = cred.CredentialSchema.ID
 
 	// Extract permissions if present
 	if len(cred.CredentialSubject.Permissions) == 0 {
@@ -303,7 +304,7 @@ func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
 		isValidateSchema:      false,
 		isVerifyPermissions:   true,
 		specification:         &defaultSpec,
-		expectedSchemaID:      "",
+		schemaID:              "",
 	}
 
 	for _, opt := range opts {
