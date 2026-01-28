@@ -1,7 +1,6 @@
 package policy
 
 import (
-	"slices"
 	"strings"
 )
 
@@ -61,18 +60,29 @@ func (r Resource) isValid(specification Specification) bool {
 		return true
 	}
 
-	return slices.Contains(specification.ResourceObjects, r.Object())
+	obj := r.Object()
+	if obj == "" {
+		return false
+	}
+
+	for _, allowed := range specification.ResourceObjects {
+		if WildcardMatch(string(obj), string(allowed)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Object returns the object part of the resource.
 // If the resource doesn't contain a colon, it returns the entire resource string.
-func (r Resource) Object() ResourceObject {
+func (r Resource) Object() string {
 	parts := strings.SplitN(r.String(), SeparatorChar, 2)
 	if len(parts) == 0 {
-		return ResourceObject("")
+		return ""
 	}
 
-	return ResourceObject(parts[0])
+	return parts[0]
 }
 
 // Suffix returns the suffix part of the resource (everything after the colon).

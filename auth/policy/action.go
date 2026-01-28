@@ -1,7 +1,6 @@
 package policy
 
 import (
-	"slices"
 	"strings"
 )
 
@@ -92,7 +91,18 @@ func (a Action) isValidObject(specification Specification) bool {
 		return true
 	}
 
-	return slices.Contains(specification.ActionObjects, ActionObject(a.Object()))
+	obj := a.Object()
+	if obj == "" {
+		return false
+	}
+
+	for _, allowed := range specification.ActionObjects {
+		if WildcardMatch(obj, string(allowed)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isValidVerb checks if the verb of the action is valid.
@@ -103,7 +113,18 @@ func (a Action) isValidVerb(specification Specification) bool {
 		return true
 	}
 
-	return slices.Contains(specification.ActionVerbs, ActionVerb(a.Verb()))
+	verb := a.Verb()
+	if verb == "" {
+		return false
+	}
+
+	for _, allowed := range specification.ActionVerbs {
+		if WildcardMatch(verb, string(allowed)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ToListActions converts a slice of strings to a slice of Action.
