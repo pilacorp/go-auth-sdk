@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
@@ -26,7 +27,7 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 		signer = ecdsa.NewPrivSigner()
 	}
 
-	if err := validateAuthData(data); err != nil {
+	if err := validateAuthData(&data); err != nil {
 		return nil, err
 	}
 	// Build credential subject with permissions
@@ -46,6 +47,7 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 			"https://www.w3.org/ns/credentials/v2",
 			"https://www.w3.org/ns/credentials/examples/v2",
 		},
+		ID: data.ID,
 		Schemas: []vc.Schema{
 			{
 				ID:   data.SchemaID,
@@ -113,7 +115,11 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 }
 
 // validateAuthData validates that the required fields in AuthData are present.
-func validateAuthData(data AuthData) error {
+func validateAuthData(data *AuthData) error {
+	if data.ID == "" {
+		data.ID = uuid.NewString()
+	}
+
 	if data.SchemaID == "" {
 		return fmt.Errorf("schema ID is required")
 	}
