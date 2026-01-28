@@ -10,6 +10,7 @@ import (
 
 // AuthData holds the authentication-specific data.
 type AuthData struct {
+	ID               string
 	IssuerDID        string
 	SchemaID         string
 	HolderDID        string
