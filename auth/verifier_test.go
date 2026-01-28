@@ -36,6 +36,21 @@ func createTestCredentialJSON(issuerDID, holderDID string, permissions []policy.
 	return jsonData
 }
 
+// Test helper to create a valid credential JSON with permissions and schema ID
+func createTestCredentialJSONWithSchema(issuerDID, holderDID, schemaID string, permissions []policy.Statement) []byte {
+	base := createTestCredentialJSON(issuerDID, holderDID, permissions)
+
+	var cred map[string]interface{}
+	_ = json.Unmarshal(base, &cred)
+
+	cred["credentialSchema"] = map[string]interface{}{
+		"id": schemaID,
+	}
+
+	jsonData, _ := json.Marshal(cred)
+	return jsonData
+}
+
 // Test helper to create a valid credential JSON without permissions
 func createTestCredentialJSONWithoutPermissions(issuerDID, holderDID string) []byte {
 	return createTestCredentialJSON(issuerDID, holderDID, nil)
@@ -222,7 +237,7 @@ func TestExtractCredentialData_WithPermissions(t *testing.T) {
 		permissions,
 	)
 
-	issuerDID, holderDID, extractedPerms, err := extractCredentialData(credJSON)
+	issuerDID, holderDID, _, extractedPerms, err := extractCredentialData(credJSON)
 	if err != nil {
 		t.Fatalf("extractCredentialData() error = %v", err)
 	}
@@ -250,7 +265,7 @@ func TestExtractCredentialData_WithoutPermissions(t *testing.T) {
 		"did:example:holder",
 	)
 
-	issuerDID, holderDID, extractedPerms, err := extractCredentialData(credJSON)
+	issuerDID, holderDID, _, extractedPerms, err := extractCredentialData(credJSON)
 	if err != nil {
 		t.Fatalf("extractCredentialData() error = %v", err)
 	}
@@ -274,7 +289,7 @@ func TestExtractCredentialData_MissingIssuer(t *testing.T) {
 		"did:example:holder",
 	)
 
-	_, _, _, err := extractCredentialData(credJSON)
+	_, _, _, _, err := extractCredentialData(credJSON)
 	if err == nil {
 		t.Error("extractCredentialData() should return error for missing issuer")
 	}
@@ -286,7 +301,7 @@ func TestExtractCredentialData_MissingCredentialSubject(t *testing.T) {
 	}
 	credJSON, _ := json.Marshal(cred)
 
-	_, _, _, err := extractCredentialData(credJSON)
+	_, _, _, _, err := extractCredentialData(credJSON)
 	if err == nil {
 		t.Error("extractCredentialData() should return error for missing credentialSubject")
 	}
@@ -311,7 +326,7 @@ func TestExtractCredentialData_PermissionsAsPolicy(t *testing.T) {
 	}
 	credJSON, _ := json.Marshal(cred)
 
-	_, _, extractedPerms, err := extractCredentialData(credJSON)
+	_, _, _, extractedPerms, err := extractCredentialData(credJSON)
 	if err != nil {
 		t.Fatalf("extractCredentialData() error = %v", err)
 	}
@@ -475,6 +490,16 @@ func TestVerifyOptions_WithSpecification(t *testing.T) {
 	}
 }
 
+func TestVerifyOptions_WithSchemaID(t *testing.T) {
+	opts, err := getVerifyOptions(WithSchemaID("https://example.com/schema"))
+	if err != nil {
+		t.Fatalf("getVerifyOptions() error = %v", err)
+	}
+	if opts.expectedSchemaID != "https://example.com/schema" {
+		t.Errorf("WithSchemaID() expectedSchemaID = %v, want 'https://example.com/schema'", opts.expectedSchemaID)
+	}
+}
+
 func TestVerifyOptions_DefaultValues(t *testing.T) {
 	opts, err := getVerifyOptions()
 	if err != nil {
@@ -525,6 +550,62 @@ func TestVerifyOptions_MultipleOptions(t *testing.T) {
 	}
 	if !opts.isCheckExpiration {
 		t.Error("Multiple options: checkExpiration = false, want true")
+	}
+}
+
+func TestVerify_WithSchemaID_Match(t *testing.T) {
+	ctx := context.Background()
+
+	permissions := []policy.Statement{
+		{
+			Effect:    policy.EffectAllow,
+			Actions:   []policy.Action{policy.NewAction("Issuer:Create")},
+			Resources: []policy.Resource{policy.NewResource(policy.ResourceObjectIssuer)},
+		},
+	}
+
+	credJSON := createTestCredentialJSONWithSchema(
+		"did:example:issuer",
+		"did:example:holder",
+		"https://example.com/schema",
+		permissions,
+	)
+
+	// Verify with matching schema ID
+	result, err := Verify(ctx, credJSON, WithSchemaID("https://example.com/schema"))
+	if err != nil {
+		t.Fatalf("Verify() with matching schema ID error = %v, want nil", err)
+	}
+	if result == nil {
+		t.Fatalf("Verify() result is nil, want non-nil")
+	}
+}
+
+func TestVerify_WithSchemaID_Mismatch(t *testing.T) {
+	ctx := context.Background()
+
+	permissions := []policy.Statement{
+		{
+			Effect:    policy.EffectAllow,
+			Actions:   []policy.Action{policy.NewAction("Issuer:Create")},
+			Resources: []policy.Resource{policy.NewResource(policy.ResourceObjectIssuer)},
+		},
+	}
+
+	credJSON := createTestCredentialJSONWithSchema(
+		"did:example:issuer",
+		"did:example:holder",
+		"https://example.com/schema",
+		permissions,
+	)
+
+	// Verify with a different expected schema ID
+	_, err := Verify(ctx, credJSON, WithSchemaID("https://other.com/schema"))
+	if err == nil {
+		t.Fatalf("Verify() with mismatched schema ID error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "credential schema ID does not match expected value") {
+		t.Fatalf("Verify() error = %v, want to contain 'credential schema ID does not match expected value'", err)
 	}
 }
 

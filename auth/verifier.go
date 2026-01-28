@@ -27,6 +27,7 @@ type verifyOptions struct {
 	// Auth SDK specific options
 	isVerifyPermissions bool
 	specification       *policy.Specification
+	expectedSchemaID    string
 }
 
 func (o *verifyOptions) validate() error {
@@ -121,6 +122,13 @@ func WithSpecification(spec policy.Specification) VerifyOpt {
 	}
 }
 
+// WithSchemaID expects the credential's schema ID to equal the given value.
+func WithSchemaID(schemaID string) VerifyOpt {
+	return func(o *verifyOptions) {
+		o.expectedSchemaID = schemaID
+	}
+}
+
 // Verify is the main entry point for credential verification.
 // It performs a comprehensive verification of a Verifiable Credential including:
 //   - Parsing the credential (supports both JWT and JSON-LD formats)
@@ -171,9 +179,16 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyR
 	}
 
 	// Extract issuer, holder, and permissions
-	issuerDID, holderDID, permissions, err := extractCredentialData(credData)
+	issuerDID, holderDID, schemaID, permissions, err := extractCredentialData(credData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract credential data: %w", err)
+	}
+
+	// Verify schema ID if expected
+	if verifyOpts.expectedSchemaID != "" {
+		if schemaID != verifyOpts.expectedSchemaID {
+			return nil, fmt.Errorf("credential schema ID does not match expected value")
+		}
 	}
 
 	// Verify permissions if enabled
@@ -204,34 +219,39 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyR
 //   - An array of Statement objects directly
 //
 // Returns an error if the credential data is malformed or required fields are missing.
-func extractCredentialData(credData []byte) (issuerDID, holderDID string, permissions []policy.Statement, err error) {
+func extractCredentialData(credData []byte) (issuerDID, holderDID string, schemaID string, permissions []policy.Statement, err error) {
 	var cred credentialData
 	if err = json.Unmarshal(credData, &cred); err != nil {
-		return "", "", nil, fmt.Errorf("failed to unmarshal credential: %w", err)
+		return "", "", "", nil, fmt.Errorf("failed to unmarshal credential: %w", err)
 	}
 
 	// Validate issuer
 	if cred.Issuer == "" {
-		return "", "", nil, fmt.Errorf("issuer must be a non-empty string")
+		return "", "", "", nil, fmt.Errorf("issuer must be a non-empty string")
 	}
 	issuerDID = cred.Issuer
 
 	// Validate credentialSubject
 	if cred.CredentialSubject.ID == "" {
-		return "", "", nil, fmt.Errorf("credentialSubject.id must be a non-empty string")
+		return "", "", "", nil, fmt.Errorf("credentialSubject.id must be a non-empty string")
 	}
 	holderDID = cred.CredentialSubject.ID
 
+	// Extract schema ID if schema id is provided
+	if cred.CredentialSchema.ID != "" {
+		schemaID = cred.CredentialSchema.ID
+	}
+
 	// Extract permissions if present
 	if len(cred.CredentialSubject.Permissions) == 0 {
-		return issuerDID, holderDID, []policy.Statement{}, nil
+		return issuerDID, holderDID, schemaID, []policy.Statement{}, nil
 	}
 
 	if err = json.Unmarshal(cred.CredentialSubject.Permissions, &permissions); err != nil {
-		return "", "", nil, fmt.Errorf("failed to unmarshal permissions: %w", err)
+		return "", "", "", nil, fmt.Errorf("failed to unmarshal permissions: %w", err)
 	}
 
-	return issuerDID, holderDID, permissions, nil
+	return issuerDID, holderDID, schemaID, permissions, nil
 }
 
 // buildCredentialOptions converts auth SDK verification options to credential SDK options.
@@ -283,6 +303,7 @@ func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
 		isValidateSchema:      false,
 		isVerifyPermissions:   true,
 		specification:         &defaultSpec,
+		expectedSchemaID:      "",
 	}
 
 	for _, opt := range opts {

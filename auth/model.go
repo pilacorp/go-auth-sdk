@@ -40,8 +40,15 @@ type credentialSubject struct {
 	Permissions json.RawMessage `json:"permissions,omitempty"`
 }
 
+// credentialSchema represents the structure of credential schema.
+type credentialSchema struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+
 // credentialData represents the structure of credential data (without proof).
 type credentialData struct {
 	Issuer            string            `json:"issuer"`
+	CredentialSchema  credentialSchema  `json:"credentialSchema"`
 	CredentialSubject credentialSubject `json:"credentialSubject"`
 }
