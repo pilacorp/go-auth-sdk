@@ -1,6 +1,8 @@
 package policy
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestNewPolicy(t *testing.T) {
 	s1 := Statement{
@@ -379,5 +381,103 @@ func TestValidateStatements_InvalidResource(t *testing.T) {
 	}
 	if err.Error() != "invalid statements: one or more statements are malformed" {
 		t.Errorf("ValidateStatements() error = %v, want 'invalid statements: one or more statements are malformed'", err)
+	}
+}
+
+func TestPolicy_ToJSON(t *testing.T) {
+	p := NewPolicy(
+		WithStatements(
+			NewStatement(
+				EffectAllow,
+				[]Action{NewAction("Issuer:Create")},
+				[]Resource{NewResource(ResourceObjectIssuer)},
+				NewCondition(),
+			),
+		),
+	)
+
+	b, err := p.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON() error = %v, want nil", err)
+	}
+	if len(b) == 0 {
+		t.Fatalf("ToJSON() returned empty bytes, want non-empty")
+	}
+}
+
+func TestPolicy_String(t *testing.T) {
+	p := NewPolicy(
+		WithStatements(
+			NewStatement(
+				EffectAllow,
+				[]Action{NewAction("Issuer:Create")},
+				[]Resource{NewResource(ResourceObjectIssuer)},
+				NewCondition(),
+			),
+		),
+	)
+
+	s := p.String()
+	if s == "" {
+		t.Fatalf("String() returned empty string, want non-empty")
+	}
+
+	// String() should be valid JSON for a policy.
+	if _, err := PolicyFromJSONString(s); err != nil {
+		t.Fatalf("String() output is not valid policy JSON: %v", err)
+	}
+}
+
+func TestPolicyFromJSON(t *testing.T) {
+	in := NewPolicy(
+		WithStatements(
+			NewStatement(
+				EffectAllow,
+				[]Action{NewAction("Issuer:Create")},
+				[]Resource{NewResource(ResourceObjectIssuer)},
+				NewCondition(),
+			),
+		),
+	)
+
+	b, err := in.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON() error = %v, want nil", err)
+	}
+
+	out, err := PolicyFromJSON(b)
+	if err != nil {
+		t.Fatalf("PolicyFromJSON() error = %v, want nil", err)
+	}
+	if len(out.Permissions) != 1 {
+		t.Fatalf("PolicyFromJSON() Permissions len = %d, want 1", len(out.Permissions))
+	}
+	if out.Permissions[0].Effect != EffectAllow {
+		t.Fatalf("PolicyFromJSON() first Effect = %s, want %s", out.Permissions[0].Effect, EffectAllow)
+	}
+}
+
+func TestPolicyFromJSONString(t *testing.T) {
+	in := NewPolicy(
+		WithStatements(
+			NewStatement(
+				EffectAllow,
+				[]Action{NewAction("Issuer:Create")},
+				[]Resource{NewResource(ResourceObjectIssuer)},
+				NewCondition(),
+			),
+		),
+	)
+
+	s := in.String()
+	out, err := PolicyFromJSONString(s)
+	if err != nil {
+		t.Fatalf("PolicyFromJSONString() error = %v, want nil", err)
+	}
+	if len(out.Permissions) != 1 {
+		t.Fatalf("PolicyFromJSONString() Permissions len = %d, want 1", len(out.Permissions))
+	}
+	if out.Permissions[0].Effect != EffectAllow {
+		t.Fatalf("PolicyFromJSONString() first Effect = %s, want %s", out.Permissions[0].Effect, EffectAllow)
 	}
 }
