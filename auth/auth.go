@@ -135,5 +135,9 @@ func validateAuthData(data AuthData) error {
 		return fmt.Errorf("holder DID is required")
 	}
 
+	if len(data.CredentialStatus) == 0 {
+		return fmt.Errorf("credential status is required")
+	}
+
 	return nil
 }
