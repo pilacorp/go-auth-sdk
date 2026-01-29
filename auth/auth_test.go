@@ -107,51 +107,6 @@ func TestAuthBuilder_Build(t *testing.T) {
 	t.Logf("Credential: %s", result.Token)
 }
 
-func TestBuild_DefaultSchemaID_WhenEmpty(t *testing.T) {
-	ctx := context.Background()
-
-	privateKey, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Failed to generate private key: %v", err)
-	}
-	privateKeyBytes := crypto.FromECDSA(privateKey)
-
-	ecdsaSigner := ecdsa.NewPrivSigner(nil)
-
-	testPolicy := policy.NewPolicy(
-		policy.WithStatements(
-			policy.NewStatement(
-				policy.EffectAllow,
-				[]policy.Action{policy.NewAction("Credential:Create")},
-				[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
-				policy.NewCondition(),
-			),
-		),
-	)
-
-	// SchemaID left empty to trigger default
-	result, err := Build(ctx, AuthData{
-		IssuerDID:        "did:example:issuer",
-		HolderDID:        "did:example:holder",
-		Policy:           testPolicy,
-		CredentialStatus: getDefaultTestStatus(),
-	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
-	if err != nil {
-		t.Fatalf("Build() with empty SchemaID should succeed and use default: %v", err)
-	}
-	if result == nil {
-		t.Fatal("Build() should return result when using default SchemaID")
-	}
-
-	// Verify the credential using the Verify function with expected schema ID.
-	// This ensures that:
-	//   - The credential can be parsed correctly
-	//   - The embedded schema ID equals DefaultSchemaID
-	if _, err := Verify(ctx, []byte(result.Token), WithSchemaID(DefaultSchemaID)); err != nil {
-		t.Fatalf("expected credential to use default schema ID %q, but verification failed: %v", DefaultSchemaID, err)
-	}
-}
-
 func TestBuild_NilSigner_UsesDefaultECDSA(t *testing.T) {
 	ctx := context.Background()
 	privateKey, err := crypto.GenerateKey()

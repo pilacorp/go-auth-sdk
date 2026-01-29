@@ -7,7 +7,7 @@ import (
 
 // NOTE: This test is an integration-style helper that simply calls the real
 // status API and logs the response. It uses the provided JWT as Authorization.
-func TestHTTPStatusBuilder_CallAndLog(t *testing.T) {
+func TestStatusBuilder_CallAndLog(t *testing.T) {
 	const issuerDID = "did:nda:testnet:0x123"
 
 	// Use the given JWT as Authorization header (Bearer or raw depends on API config).

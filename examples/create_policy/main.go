@@ -104,7 +104,7 @@ func main() {
 	)
 
 	customSpecPolicy := policy.NewPolicy(
-		policy.WithSpecification(customSpec),
+		policy.WithSpecification(&customSpec),
 		policy.WithStatements(
 			policy.NewStatement(
 				policy.EffectAllow,

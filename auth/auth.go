@@ -27,10 +27,6 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 		signer = ecdsa.NewPrivSigner(nil)
 	}
 
-	if data.SchemaID == "" {
-		data.SchemaID = DefaultSchemaID
-	}
-
 	if err := validateAuthData(data); err != nil {
 		return nil, err
 	}

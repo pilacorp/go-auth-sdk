@@ -56,7 +56,7 @@ type AuthData struct {
 const DefaultSchemaID = "https://auth-dev.pila.vn/api/v1/schemas/e8429e35-5486-4f05-a06c-2bd211f99fc8"
 ```
 
-- **Policy**: list of statements describing permissions:
+- **Policy**: list of statements describing permissions. Policies should be created using `policy.NewPolicy()` to ensure proper initialization:
 
 ```go
 stmt := policy.NewStatement(
@@ -66,10 +66,27 @@ stmt := policy.NewStatement(
 	policy.NewCondition(),                           // conditions (can be empty)
 )
 
+// Method 1: Use default specification (recommended for most cases)
 p := policy.NewPolicy(
 	policy.WithStatements(stmt),
 )
+
+// Method 2: Use custom specification (if you need different action/resource validation rules)
+customSpec := policy.NewSpecification(
+	[]policy.ActionObject{policy.ActionObjectIssuer, policy.ActionObjectCredential},
+	[]policy.ActionVerb{policy.ActionVerbCreate, policy.ActionVerbUpdate},
+	[]policy.ResourceObject{policy.ResourceObjectIssuer, policy.ResourceObjectCredential},
+)
+p := policy.NewPolicy(
+	policy.WithSpecification(&customSpec), // Pass pointer to allow reuse across multiple policies
+	policy.WithStatements(stmt),
+)
 ```
+
+**Note about Policy creation:**
+- Policies should be created using `policy.NewPolicy()` to ensure proper initialization.
+- If a Policy is created directly (e.g., from JSON unmarshaling), methods will automatically use the default specification when `Specification` is `nil`.
+- When using `WithSpecification()`, pass a pointer (`&spec`) to allow multiple policies to share the same specification instance (memory efficient).
 
 - **CredentialStatus** (required):
   - Used to attach status information to the credential (especially for revocation checking).

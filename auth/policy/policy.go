@@ -34,18 +34,36 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 )
+
+var (
+	globalSpec     *Specification
+	globalSpecOnce sync.Once
+)
+
+// getGlobalSpecification returns the global singleton Specification.
+func getGlobalSpecification() *Specification {
+	globalSpecOnce.Do(func() {
+		spec := DefaultSpecification()
+		globalSpec = &spec
+	})
+
+	return globalSpec
+}
 
 // PolicyOption configures a Policy during construction.
 type PolicyOption func(*Policy)
 
 // WithSpecification sets a custom specification for the policy.
 // If specification is zero-value, the policy keeps the default specification.
-func WithSpecification(specification Specification) PolicyOption {
+func WithSpecification(specification *Specification) PolicyOption {
 	return func(p *Policy) {
 		if len(specification.ActionObjects) == 0 &&
 			len(specification.ActionVerbs) == 0 &&
 			len(specification.ResourceObjects) == 0 {
+			p.Specification = getGlobalSpecification()
+
 			return
 		}
 		p.Specification = specification
@@ -61,15 +79,15 @@ func WithStatements(statements ...Statement) PolicyOption {
 
 // Policy represents a collection of permission statements.
 type Policy struct {
-	Permissions   []Statement   `json:"permissions"`
-	Specification Specification `json:"specification"`
+	Permissions   []Statement    `json:"permissions"`
+	Specification *Specification `json:"specification"`
 }
 
 // NewPolicy constructs a Policy from the given options.
 // If no specification option is provided, it defaults to DefaultSpecification().
 func NewPolicy(options ...PolicyOption) Policy {
 	p := Policy{
-		Specification: DefaultSpecification(),
+		Specification: getGlobalSpecification(),
 	}
 	for _, opt := range options {
 		if opt == nil {
@@ -179,8 +197,13 @@ func (p Policy) IsValid() bool {
 		return false
 	}
 
+	spec := p.Specification
+	if spec == nil {
+		spec = getGlobalSpecification()
+	}
+
 	for _, stmt := range p.Permissions {
-		if !stmt.isValid(p.Specification) {
+		if !stmt.isValid(*spec) {
 			return false
 		}
 	}
@@ -208,7 +231,7 @@ func ValidateStatements(statements []Statement, spec Specification) error {
 
 	// Create a policy with the provided specification to validate statements
 	pol := NewPolicy(
-		WithSpecification(spec),
+		WithSpecification(&spec),
 		WithStatements(statements...),
 	)
 
