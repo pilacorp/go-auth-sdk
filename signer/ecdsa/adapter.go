@@ -10,23 +10,48 @@ import (
 )
 
 // privSigner is the provider implementation that uses a private key for signing.
-type privSigner struct{}
-
-// NewPrivSigner creates a new privSigner instance.
-func NewPrivSigner() signer.Signer {
-	return &privSigner{}
+type privSigner struct {
+	privateKey []byte
 }
 
-// Sign signs the payload using the private key
+// NewPrivSignerWithPrivateKey creates a new privSigner instance with a private key embedded in the struct.
+// The private key can still be overridden via signer.WithPrivateKey() option when calling Sign().
+func NewPrivSignerWithPrivateKey(privateKey []byte) signer.Signer {
+	return &privSigner{
+		privateKey: privateKey,
+	}
+}
+
+// NewPrivSigner creates a new privSigner instance without an embedded private key.
+// The private key must be provided via signer.WithPrivateKey() option when calling Sign().
+func NewPrivSigner() signer.Signer {
+	return &privSigner{
+		privateKey: nil,
+	}
+}
+
+// Sign signs the payload using the private key.
+// Private key priority: opts.PrivateKey (if provided) > p.privateKey (struct field).
+// At least one must be provided, otherwise returns an error.
 func (p *privSigner) Sign(ctx context.Context, payload []byte, opts ...signer.SignOption) ([]byte, error) {
 	options := &signer.SignOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	privateKey, err := crypto.ToECDSA(options.PrivateKey)
+	// Determine which private key to use: opts take precedence over struct field
+	var privateKeyBytes []byte
+	if options.PrivateKey != nil {
+		privateKeyBytes = options.PrivateKey
+	} else if p.privateKey != nil {
+		privateKeyBytes = p.privateKey
+	} else {
+		return nil, fmt.Errorf("private key is not provided: neither in options nor in signer struct")
+	}
+
+	privateKey, err := crypto.ToECDSA(privateKeyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to reconstruct private key from retrieved hex: %w", err)
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 
 	sig, err := crypto.Sign(payload, privateKey)

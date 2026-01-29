@@ -91,7 +91,58 @@ Ví dụ 1 phần tử status:
 }
 ```
 
-#### 3. Build credential (tạo VC-JWT)
+#### 3. Signer (ký credential)
+
+SDK hỗ trợ 2 loại signer để ký credential:
+
+##### 3.1. ECDSA Signer (local private key)
+
+ECDSA signer dùng private key local để ký. Có 2 cách khởi tạo:
+
+**Cách 1: Khởi tạo không có key, truyền key qua options khi sign**
+
+```go
+import "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+
+ecdsaSigner := ecdsa.NewPrivSigner()
+// Private key phải được truyền qua signer.WithPrivateKey() khi gọi Build()
+resp, err := auth.Build(ctx, data, ecdsaSigner, signer.WithPrivateKey(myPrivKeyBytes))
+```
+
+**Cách 2: Khởi tạo với key trong struct**
+
+```go
+import "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+
+ecdsaSigner := ecdsa.NewPrivSignerWithPrivateKey(myPrivKeyBytes)
+// Có thể dùng key trong struct, hoặc override bằng signer.WithPrivateKey()
+resp, err := auth.Build(ctx, data, ecdsaSigner) // dùng key trong struct
+// hoặc
+resp, err := auth.Build(ctx, data, ecdsaSigner, signer.WithPrivateKey(anotherKey)) // override bằng key khác
+```
+
+**Priority của private key:**
+- Nếu truyền `signer.WithPrivateKey()` trong options → dùng key từ options (priority cao nhất)
+- Nếu không có trong options → dùng key từ struct (nếu có)
+- Nếu cả 2 đều không có → trả về lỗi
+
+##### 3.2. Vault Signer (remote signing service)
+
+Vault signer ký credential thông qua Vault service (phù hợp cho production, key không lưu local):
+
+```go
+import "github.com/pilacorp/go-auth-sdk/signer/vault"
+
+vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
+// Signer address phải được truyền qua signer.WithSignerAddress() khi gọi Build()
+resp, err := auth.Build(ctx, data, vaultSigner, signer.WithSignerAddress("0x1234..."))
+```
+
+**Lưu ý:**
+- Vault signer yêu cầu `signer.WithSignerAddress()` để chỉ định địa chỉ account trong Vault
+- Nếu không truyền signer address → sẽ trả về lỗi
+
+#### 4. Build credential (tạo VC-JWT)
 
 ```go
 ctx := context.Background()
@@ -124,7 +175,7 @@ data := auth.AuthData{
 	// ValidFrom / ValidUntil: có thể set nếu cần
 }
 
-// signer: có thể là ECDSA signer hoặc Vault signer
+// signer: có thể là ECDSA signer hoặc Vault signer (xem section 3 ở trên)
 ecdsaSigner := ecdsa.NewPrivSigner()
 
 resp, err := auth.Build(ctx, data, ecdsaSigner, signer.WithPrivateKey(myPrivKeyBytes))
@@ -136,7 +187,7 @@ if err != nil {
 fmt.Println("VC-JWT:", resp.Token)
 ```
 
-#### 4. Verify credential (check VC-JWT + extract permissions)
+#### 5. Verify credential (check VC-JWT + extract permissions)
 
 ```go
 ctx := context.Background()
@@ -149,6 +200,7 @@ result, err := auth.Verify(
 	auth.WithSchemaValidation(),             // validate theo schema
 	auth.WithCheckRevocation(),              // (optional) kiểm tra status/revocation
 	auth.WithSchemaID(auth.DefaultSchemaID), // kỳ vọng đúng schema ID
+	auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"), // URL để resolve DID document
 )
 if err != nil {
 	log.Fatalf("verify credential error: %v", err)

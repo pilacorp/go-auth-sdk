@@ -23,6 +23,10 @@ func createTestCredentialJSON(issuerDID, holderDID string, permissions []policy.
 		"credentialSubject": map[string]interface{}{
 			"id": holderDID,
 		},
+		"credentialSchema": map[string]interface{}{
+			"id":   "https://example.com/schema/v1",
+			"type": "JsonSchema",
+		},
 		"validFrom":  time.Now().Format(time.RFC3339),
 		"validUntil": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
 	}
@@ -322,6 +326,10 @@ func TestExtractCredentialData_PermissionsAsPolicy(t *testing.T) {
 		"credentialSubject": map[string]interface{}{
 			"id":          "did:example:holder",
 			"permissions": permissions,
+		},
+		"credentialSchema": map[string]interface{}{
+			"id":   "https://example.com/schema/v1",
+			"type": "JsonSchema",
 		},
 	}
 	credJSON, _ := json.Marshal(cred)

@@ -17,6 +17,19 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
+// getDefaultTestStatus returns a default status for testing purposes
+func getDefaultTestStatus() []vc.Status {
+	return []vc.Status{
+		{
+			ID:                   "https://example.com/status/0#0",
+			Type:                 "StatusList2021Entry",
+			StatusPurpose:        "revocation",
+			StatusListIndex:      "0",
+			StatusListCredential: "https://example.com/status/0",
+		},
+	}
+}
+
 func TestAuthBuilder_Build(t *testing.T) {
 	ctx := context.Background()
 
@@ -118,9 +131,10 @@ func TestBuild_DefaultSchemaID_WhenEmpty(t *testing.T) {
 
 	// SchemaID left empty to trigger default
 	result, err := Build(ctx, AuthData{
-		IssuerDID: "did:example:issuer",
-		HolderDID: "did:example:holder",
-		Policy:    testPolicy,
+		IssuerDID:        "did:example:issuer",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		CredentialStatus: getDefaultTestStatus(),
 	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 	if err != nil {
 		t.Fatalf("Build() with empty SchemaID should succeed and use default: %v", err)
@@ -158,10 +172,11 @@ func TestBuild_NilSigner_UsesDefaultECDSA(t *testing.T) {
 	)
 
 	result, err := Build(ctx, AuthData{
-		IssuerDID: "did:example:issuer",
-		SchemaID:  "https://example.com/schema/v1",
-		HolderDID: "did:example:holder",
-		Policy:    testPolicy,
+		IssuerDID:        "did:example:issuer",
+		SchemaID:         "https://example.com/schema/v1",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		CredentialStatus: getDefaultTestStatus(),
 	}, nil, signer.WithPrivateKey(privateKeyBytes))
 	if err != nil {
 		t.Fatalf("Build() with nil signer should succeed: %v", err)
@@ -182,10 +197,11 @@ func TestAuthBuilder_Build_EmptyPolicy(t *testing.T) {
 
 	emptyPolicy := policy.NewPolicy()
 	result, err := Build(ctx, AuthData{
-		IssuerDID: "did:example:issuer",
-		SchemaID:  "https://example.com/schema/v1",
-		HolderDID: "did:example:holder",
-		Policy:    emptyPolicy,
+		IssuerDID:        "did:example:issuer",
+		SchemaID:         "https://example.com/schema/v1",
+		HolderDID:        "did:example:holder",
+		Policy:           emptyPolicy,
+		CredentialStatus: getDefaultTestStatus(),
 	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 
 	if err != nil {
@@ -217,10 +233,11 @@ func TestAuthBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 	)
 
 	result, err := Build(ctx, AuthData{
-		IssuerDID: "did:example:issuer",
-		SchemaID:  "https://example.com/schema/v1",
-		HolderDID: "did:example:holder",
-		Policy:    testPolicy,
+		IssuerDID:        "did:example:issuer",
+		SchemaID:         "https://example.com/schema/v1",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		CredentialStatus: getDefaultTestStatus(),
 		// ValidFrom and ValidUntil are nil
 	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 
@@ -254,11 +271,12 @@ func TestAuthBuilder_Build_OnlyValidFrom(t *testing.T) {
 	)
 
 	result, err := Build(ctx, AuthData{
-		IssuerDID: "did:example:issuer",
-		SchemaID:  "https://example.com/schema/v1",
-		HolderDID: "did:example:holder",
-		Policy:    testPolicy,
-		ValidFrom: &validFrom,
+		IssuerDID:        "did:example:issuer",
+		SchemaID:         "https://example.com/schema/v1",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		ValidFrom:        &validFrom,
+		CredentialStatus: getDefaultTestStatus(),
 		// ValidUntil is nil
 	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 
@@ -291,10 +309,11 @@ func TestAuthBuilder_Build_MultipleCredentials(t *testing.T) {
 		)
 
 		result, err := Build(ctx, AuthData{
-			IssuerDID: "did:example:issuer",
-			SchemaID:  "https://example.com/schema/v1",
-			HolderDID: holderDID,
-			Policy:    testPolicy,
+			IssuerDID:        "did:example:issuer",
+			SchemaID:         "https://example.com/schema/v1",
+			HolderDID:        holderDID,
+			Policy:           testPolicy,
+			CredentialStatus: getDefaultTestStatus(),
 		}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 
 		if err != nil {
@@ -327,10 +346,11 @@ func TestAuthBuilder_Build_InvalidPrivateKey(t *testing.T) {
 	// Use invalid private key (too short)
 	invalidKey := []byte{1, 2, 3}
 	result, err := Build(ctx, AuthData{
-		IssuerDID: "did:example:issuer",
-		SchemaID:  "https://example.com/schema/v1",
-		HolderDID: "did:example:holder",
-		Policy:    testPolicy,
+		IssuerDID:        "did:example:issuer",
+		SchemaID:         "https://example.com/schema/v1",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		CredentialStatus: getDefaultTestStatus(),
 	}, ecdsaSigner, signer.WithPrivateKey(invalidKey))
 
 	// Should fail because invalid private key
@@ -360,10 +380,11 @@ func TestAuthBuilder_Build_EmptyHolderDID(t *testing.T) {
 	)
 
 	result, err := Build(ctx, AuthData{
-		IssuerDID: "did:example:issuer",
-		SchemaID:  "https://example.com/schema/v1",
-		HolderDID: "", // Empty holder DID
-		Policy:    testPolicy,
+		IssuerDID:        "did:example:issuer",
+		SchemaID:         "https://example.com/schema/v1",
+		HolderDID:        "", // Empty holder DID
+		Policy:           testPolicy,
+		CredentialStatus: getDefaultTestStatus(),
 	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
 
 	// Empty holder DID should return error
@@ -448,12 +469,13 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 
 	// Build credential with Vault signer
 	result, err := Build(ctx, AuthData{
-		IssuerDID:  "did:example:issuer",
-		SchemaID:   "https://example.com/schema/v1",
-		HolderDID:  "did:example:holder",
-		Policy:     testPolicy,
-		ValidFrom:  &validFrom,
-		ValidUntil: &validUntil,
+		IssuerDID:        "did:example:issuer",
+		SchemaID:         "https://example.com/schema/v1",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		ValidFrom:        &validFrom,
+		ValidUntil:       &validUntil,
+		CredentialStatus: getDefaultTestStatus(),
 	}, vaultSigner, signer.WithSignerAddress(signerAddress))
 
 	if err != nil {
@@ -492,10 +514,11 @@ func TestAuthBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
 
 	// Build without signer address - should fail
 	result, err := Build(ctx, AuthData{
-		IssuerDID: "did:example:issuer",
-		SchemaID:  "https://example.com/schema/v1",
-		HolderDID: "did:example:holder",
-		Policy:    testPolicy,
+		IssuerDID:        "did:example:issuer",
+		SchemaID:         "https://example.com/schema/v1",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		CredentialStatus: getDefaultTestStatus(),
 	}, vaultSigner /* no signer address option */)
 
 	// Should fail because signer address is required for Vault
