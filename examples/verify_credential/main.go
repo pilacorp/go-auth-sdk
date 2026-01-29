@@ -26,7 +26,7 @@ func main() {
 	privateKeyBytes := crypto.FromECDSA(privateKey)
 
 	// Step 2: Create signer
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	// Step 3: Create policy
 	policy := policy.NewPolicy(

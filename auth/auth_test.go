@@ -42,7 +42,7 @@ func TestAuthBuilder_Build(t *testing.T) {
 	privateKeyBytes := crypto.FromECDSA(privateKey)
 
 	// Create ECDSA provider
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	// Create comprehensive policy with multiple statements and conditions
 	actions1 := []policy.Action{
@@ -116,7 +116,7 @@ func TestBuild_DefaultSchemaID_WhenEmpty(t *testing.T) {
 	}
 	privateKeyBytes := crypto.FromECDSA(privateKey)
 
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	testPolicy := policy.NewPolicy(
 		policy.WithStatements(
@@ -193,7 +193,7 @@ func TestAuthBuilder_Build_EmptyPolicy(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	emptyPolicy := policy.NewPolicy()
 	result, err := Build(ctx, AuthData{
@@ -219,7 +219,7 @@ func TestAuthBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	testPolicy := policy.NewPolicy(
 		policy.WithStatements(
@@ -256,7 +256,7 @@ func TestAuthBuilder_Build_OnlyValidFrom(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	validFrom := time.Now()
 	testPolicy := policy.NewPolicy(
@@ -292,7 +292,7 @@ func TestAuthBuilder_Build_MultipleCredentials(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	// Build multiple credentials with same builder
 	holders := []string{"did:example:holder1", "did:example:holder2", "did:example:holder3"}
@@ -330,7 +330,7 @@ func TestAuthBuilder_Build_MultipleCredentials(t *testing.T) {
 
 func TestAuthBuilder_Build_InvalidPrivateKey(t *testing.T) {
 	ctx := context.Background()
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	testPolicy := policy.NewPolicy(
 		policy.WithStatements(
@@ -366,7 +366,7 @@ func TestAuthBuilder_Build_EmptyHolderDID(t *testing.T) {
 	ctx := context.Background()
 	privateKey, _ := crypto.GenerateKey()
 	privateKeyBytes := crypto.FromECDSA(privateKey)
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	testPolicy := policy.NewPolicy(
 		policy.WithStatements(

@@ -24,7 +24,7 @@ import (
 func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...signer.SignOption) (*AuthResponse, error) {
 	// If signer is not provided, use ECDSA signer
 	if signer == nil {
-		signer = ecdsa.NewPrivSigner()
+		signer = ecdsa.NewPrivSigner(nil)
 	}
 
 	if data.SchemaID == "" {

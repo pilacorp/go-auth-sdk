@@ -11,22 +11,15 @@ import (
 
 // privSigner is the provider implementation that uses a private key for signing.
 type privSigner struct {
-	privateKey []byte
+	defaultPrivateKey []byte
 }
 
-// NewPrivSignerWithPrivateKey creates a new privSigner instance with a private key embedded in the struct.
+// NewPrivSigner creates a new privSigner instance with a private key embedded in the struct.
 // The private key can still be overridden via signer.WithPrivateKey() option when calling Sign().
-func NewPrivSignerWithPrivateKey(privateKey []byte) signer.Signer {
+// Input nil if you want to use the private key from the signer.
+func NewPrivSigner(privateKey []byte) signer.Signer {
 	return &privSigner{
-		privateKey: privateKey,
-	}
-}
-
-// NewPrivSigner creates a new privSigner instance without an embedded private key.
-// The private key must be provided via signer.WithPrivateKey() option when calling Sign().
-func NewPrivSigner() signer.Signer {
-	return &privSigner{
-		privateKey: nil,
+		defaultPrivateKey: privateKey,
 	}
 }
 
@@ -43,8 +36,8 @@ func (p *privSigner) Sign(ctx context.Context, payload []byte, opts ...signer.Si
 	var privateKeyBytes []byte
 	if options.PrivateKey != nil {
 		privateKeyBytes = options.PrivateKey
-	} else if p.privateKey != nil {
-		privateKeyBytes = p.privateKey
+	} else if p.defaultPrivateKey != nil {
+		privateKeyBytes = p.defaultPrivateKey
 	} else {
 		return nil, fmt.Errorf("private key is not provided: neither in options nor in signer struct")
 	}

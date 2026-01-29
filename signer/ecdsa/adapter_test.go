@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewProviderPriv(t *testing.T) {
-	p := NewPrivSigner()
+	p := NewPrivSigner(nil)
 	if p == nil {
 		t.Fatal("NewPrivSigner() returned nil")
 	}
@@ -65,7 +65,7 @@ func TestProviderPriv_Sign(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewPrivSigner()
+			p := NewPrivSigner(nil)
 			ctx := context.Background()
 
 			sig, err := p.Sign(ctx, tt.payload, tt.opts...)

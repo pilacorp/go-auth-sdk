@@ -18,16 +18,16 @@ type StatusBuilder interface {
 	CreateStatus(ctx context.Context, issuerDID string) ([]vc.Status, error)
 }
 
-// HTTPStatusProvider is the default implementation that calls an HTTP API
+// statusBuilder is the default implementation that calls an HTTP API
 // to register credential status entries.
-type HTTPStatusBuilder struct {
-	Endpoint   string
-	AuthToken  string
-	HTTPClient *http.Client
+type statusBuilder struct {
+	endpoint   string
+	authToken  string
+	httpClient *http.Client
 }
 
-// NewDefaultStatusProvider creates a default HTTPStatusProvider that calls
-// the local status registration API:
+// NewDefaultStatusBuilder creates a default StatusBuilder that calls
+// the status registration API:
 //
 //	POST https://api.ndadid.vn/api/v1/credentials/status/register
 //
@@ -37,28 +37,17 @@ type HTTPStatusBuilder struct {
 //
 // The provided authToken will be sent in the Authorization header.
 func NewDefaultStatusBuilder(authToken string) StatusBuilder {
-	return &HTTPStatusBuilder{
-		Endpoint:  "https://api.ndadid.vn/api/v1/credentials/status/register",
-		AuthToken: authToken,
-		HTTPClient: &http.Client{
+	return &statusBuilder{
+		endpoint:  "https://api.ndadid.vn/api/v1/credentials/status/register",
+		authToken: authToken,
+		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 	}
 }
 
-// CreateStatus implements StatusProvider by calling the configured HTTP API.
-func (p *HTTPStatusBuilder) CreateStatus(ctx context.Context, issuerDID string) ([]vc.Status, error) {
-	if p.Endpoint == "" {
-		return nil, fmt.Errorf("status builder endpoint is empty")
-	}
-
-	client := p.HTTPClient
-	if client == nil {
-		client = &http.Client{
-			Timeout: 10 * time.Second,
-		}
-	}
-
+// CreateStatus implements StatusBuilder by calling the configured HTTP API.
+func (p *statusBuilder) CreateStatus(ctx context.Context, issuerDID string) ([]vc.Status, error) {
 	payload := statusRequest{
 		IssuerDID: issuerDID,
 	}
@@ -68,18 +57,18 @@ func (p *HTTPStatusBuilder) CreateStatus(ctx context.Context, issuerDID string) 
 		return nil, fmt.Errorf("failed to marshal status request payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.Endpoint, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create status request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	if p.AuthToken != "" {
-		req.Header.Set("Authorization", p.AuthToken)
+	if p.authToken != "" {
+		req.Header.Set("Authorization", p.authToken)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call status provider API: %w", err)
 	}

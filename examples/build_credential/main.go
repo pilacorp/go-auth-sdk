@@ -28,7 +28,7 @@ func main() {
 	fmt.Println("✓ Generated private key")
 
 	// Step 2: Create an ECDSA signer
-	ecdsaSigner := ecdsa.NewPrivSigner()
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 	fmt.Println("✓ Created ECDSA signer")
 
 	// Step 3: Create a policy with permission statements
