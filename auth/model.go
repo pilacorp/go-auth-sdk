@@ -8,6 +8,8 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
+const DefaultSchemaID = "https://auth-dev.pila.vn/api/v1/schemas/e8429e35-5486-4f05-a06c-2bd211f99fc8"
+
 // AuthData holds the authentication-specific data.
 type AuthData struct {
 	ID               string
