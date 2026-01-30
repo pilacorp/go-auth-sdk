@@ -20,8 +20,12 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
+// AuthBuilderConfig is a configuration for the AuthBuilder.
 type AuthBuilderConfig struct {
-	schemaID      string
+	// Credential configuration
+	schemaID string
+
+	// Signing configuration (could be separate)
 	signer        signer.Signer
 	signerOptions []signer.SignOption
 }
@@ -31,25 +35,25 @@ type AuthBuilder struct {
 	config *AuthBuilderConfig
 }
 
-// AuthBuilderOption is a function that configures the AuthBuilder.
-type AuthBuilderOption func(*AuthBuilderConfig)
+// AuthBuilderConfigOption is a function that configures the AuthBuilderConfig.
+type AuthBuilderConfigOption func(*AuthBuilderConfig)
 
 // WithBuilderSchemaID sets the schema ID for the AuthBuilder.
-func WithBuilderSchemaID(schemaID string) AuthBuilderOption {
+func WithBuilderSchemaID(schemaID string) AuthBuilderConfigOption {
 	return func(b *AuthBuilderConfig) {
 		b.schemaID = schemaID
 	}
 }
 
 // WithSignerOptions sets the signer options for the AuthBuilder.
-func WithSignerOptions(opts ...signer.SignOption) AuthBuilderOption {
+func WithSignerOptions(opts ...signer.SignOption) AuthBuilderConfigOption {
 	return func(b *AuthBuilderConfig) {
 		b.signerOptions = opts
 	}
 }
 
 // WithSigner sets the signer for the AuthBuilder.
-func WithSigner(signer signer.Signer) AuthBuilderOption {
+func WithSigner(signer signer.Signer) AuthBuilderConfigOption {
 	return func(b *AuthBuilderConfig) {
 		if signer != nil {
 			b.signer = signer
@@ -57,8 +61,8 @@ func WithSigner(signer signer.Signer) AuthBuilderOption {
 	}
 }
 
-// NewAuthBuilder creates a new AuthBuilder with the given options.
-func NewAuthBuilder(opts ...AuthBuilderOption) *AuthBuilder {
+// NewAuthBuilder creates a new AuthBuilder with the given config options“.
+func NewAuthBuilder(opts ...AuthBuilderConfigOption) *AuthBuilder {
 	config := &AuthBuilderConfig{
 		signer: ecdsa.NewPrivSigner(nil),
 	}
@@ -75,8 +79,8 @@ func NewAuthBuilder(opts ...AuthBuilderOption) *AuthBuilder {
 }
 
 // Build creates and signs the VC-JWT payload using the configured signer.
-func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuilderOption) (*AuthResponse, error) {
-	options := b.overrideBuilderOptions(opts...)
+func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuilderConfigOption) (*AuthResponse, error) {
+	options := b.mergeConfig(opts...)
 
 	if err := validateAuthData(data, options); err != nil {
 		return nil, err
@@ -193,9 +197,9 @@ func validateAuthData(data AuthData, options *AuthBuilderConfig) error {
 	return nil
 }
 
-// overrideBuilderOptions returns a deep copy of builder options with overrides applied.
-func (b *AuthBuilder) overrideBuilderOptions(opts ...AuthBuilderOption) *AuthBuilderConfig {
-	// clone the builder options, ensure not change the original builder config
+// mergeConfig merges the options into the builder config.
+func (b *AuthBuilder) mergeConfig(opts ...AuthBuilderConfigOption) *AuthBuilderConfig {
+	// merge the options into the builder config
 	options := &AuthBuilderConfig{
 		schemaID:      b.config.schemaID,
 		signer:        b.config.signer,
