@@ -20,14 +20,69 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-// Build creates the VC-JWT payload and optionally signs it if a signer is available.
-func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...signer.SignOption) (*AuthResponse, error) {
-	// If signer is not provided, use ECDSA signer
-	if signer == nil {
-		signer = ecdsa.NewPrivSigner()
+// AuthBuilderConfig is a configuration for the AuthBuilder.
+type AuthBuilderConfig struct {
+	// Credential configuration
+	schemaID string
+
+	// Signing configuration (could be separate)
+	signer        signer.Signer
+	signerOptions []signer.SignOption
+}
+
+// AuthBuilder is a builder for creating and signing VC-JWT credentials with embedded permissions.
+type AuthBuilder struct {
+	config *AuthBuilderConfig
+}
+
+// AuthBuilderConfigOption is a function that configures the AuthBuilderConfig.
+type AuthBuilderConfigOption func(*AuthBuilderConfig)
+
+// WithBuilderSchemaID sets the schema ID for the AuthBuilder.
+func WithBuilderSchemaID(schemaID string) AuthBuilderConfigOption {
+	return func(b *AuthBuilderConfig) {
+		b.schemaID = schemaID
+	}
+}
+
+// WithSignerOptions sets the signer options for the AuthBuilder.
+func WithSignerOptions(opts ...signer.SignOption) AuthBuilderConfigOption {
+	return func(b *AuthBuilderConfig) {
+		b.signerOptions = opts
+	}
+}
+
+// WithSigner sets the signer for the AuthBuilder.
+func WithSigner(signer signer.Signer) AuthBuilderConfigOption {
+	return func(b *AuthBuilderConfig) {
+		if signer != nil {
+			b.signer = signer
+		}
+	}
+}
+
+// NewAuthBuilder creates a new AuthBuilder with the given config options“.
+func NewAuthBuilder(opts ...AuthBuilderConfigOption) *AuthBuilder {
+	config := &AuthBuilderConfig{
+		signer: ecdsa.NewPrivSigner(nil),
 	}
 
-	if err := validateAuthData(data); err != nil {
+	for _, opt := range opts {
+		if opt != nil {
+			opt(config)
+		}
+	}
+
+	return &AuthBuilder{
+		config: config,
+	}
+}
+
+// Build creates and signs the VC-JWT payload using the configured signer.
+func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuilderConfigOption) (*AuthResponse, error) {
+	options := b.mergeConfig(opts...)
+
+	if err := validateAuthData(data, options); err != nil {
 		return nil, err
 	}
 	// Build credential subject with permissions
@@ -53,7 +108,7 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 		ID: data.ID,
 		Schemas: []vc.Schema{
 			{
-				ID:   data.SchemaID,
+				ID:   options.schemaID,
 				Type: "JsonSchema",
 			},
 		},
@@ -88,7 +143,7 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 	hash := sha256.Sum256(signData)
 
 	// Sign the credential
-	signature, err := signer.Sign(ctx, hash[:], opts...)
+	signature, err := options.signer.Sign(ctx, hash[:], options.signerOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign credential: %w", err)
 	}
@@ -118,9 +173,13 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 }
 
 // validateAuthData validates that the required fields in AuthData are present.
-func validateAuthData(data AuthData) error {
-	if data.SchemaID == "" {
+func validateAuthData(data AuthData, options *AuthBuilderConfig) error {
+	if options.schemaID == "" {
 		return fmt.Errorf("schema ID is required")
+	}
+
+	if options.signer == nil {
+		return fmt.Errorf("signer is required")
 	}
 
 	if data.IssuerDID == "" {
@@ -131,5 +190,28 @@ func validateAuthData(data AuthData) error {
 		return fmt.Errorf("holder DID is required")
 	}
 
+	if len(data.CredentialStatus) == 0 {
+		return fmt.Errorf("credential status is required")
+	}
+
 	return nil
+}
+
+// mergeConfig merges the options into the builder config.
+func (b *AuthBuilder) mergeConfig(opts ...AuthBuilderConfigOption) *AuthBuilderConfig {
+	// merge the options into the builder config
+	options := &AuthBuilderConfig{
+		schemaID:      b.config.schemaID,
+		signer:        b.config.signer,
+		signerOptions: make([]signer.SignOption, len(b.config.signerOptions)),
+	}
+	copy(options.signerOptions, b.config.signerOptions)
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(options)
+		}
+	}
+
+	return options
 }

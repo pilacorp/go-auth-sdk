@@ -44,6 +44,7 @@ import (
     "github.com/pilacorp/go-auth-sdk/auth/policy"
     "github.com/pilacorp/go-auth-sdk/signer"
     "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+    "github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
 // Generate private key
@@ -51,8 +52,8 @@ privateKey, _ := crypto.GenerateKey()
 privateKeyBytes := crypto.FromECDSA(privateKey)
 
 // Create signer and policy
-ecdsaSigner := ecdsa.NewPrivSigner()
-policy := policy.NewPolicy(
+ecdsaSigner := ecdsa.NewPrivSigner(nil)
+testPolicy := policy.NewPolicy(
     policy.WithStatements(
         policy.NewStatement(
             policy.EffectAllow,
@@ -63,16 +64,29 @@ policy := policy.NewPolicy(
     ),
 )
 
+// Create credential status (required)
+credentialStatus := []vc.Status{
+    {
+        ID:                   "https://example.com/status/0#0",
+        Type:                 "StatusList2021Entry",
+        StatusPurpose:        "revocation",
+        StatusListIndex:      "0",
+        StatusListCredential: "https://example.com/status/0",
+    },
+}
+
+// Create AuthBuilder and build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, _ := auth.Build(context.Background(), auth.AuthData{
-    IssuerDID:  "did:example:issuer",
-    SchemaID:   "https://example.com/schema/v1",
-    HolderDID:  "did:example:holder",
-    Policy:     policy,
-    ValidFrom:  &validFrom,
-    ValidUntil: &validUntil,
-}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
+builder := auth.NewAuthBuilder("https://example.com/schema/v1", auth.WithSigner(ecdsaSigner))
+result, _ := builder.Build(context.Background(), auth.AuthData{
+    IssuerDID:        "did:example:issuer",
+    HolderDID:        "did:example:holder",
+    Policy:           testPolicy,
+    ValidFrom:        &validFrom,
+    ValidUntil:       &validUntil,
+    CredentialStatus: credentialStatus,
+}, auth.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 ```
 
 ### Verifying a Credential
