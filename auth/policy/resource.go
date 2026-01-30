@@ -75,10 +75,10 @@ func (r Resource) isValid(specification Specification) bool {
 }
 
 // Object returns the object part of the resource.
-// If the resource doesn't contain a colon, it returns the entire resource string.
+// If the resource doesn't contain a colon, it returns an empty string.
 func (r Resource) Object() string {
 	parts := strings.SplitN(r.String(), SeparatorChar, 2)
-	if len(parts) == 0 {
+	if len(parts) < 2 {
 		return ""
 	}
 
