@@ -12,12 +12,11 @@ import (
 type AuthData struct {
 	ID               string
 	IssuerDID        string
-	SchemaID         string
 	HolderDID        string
 	Policy           policy.Policy
+	CredentialStatus []vc.Status
 	ValidFrom        *time.Time
 	ValidUntil       *time.Time
-	CredentialStatus []vc.Status
 }
 
 // AuthResponse represents the result of building an authentication.
@@ -51,4 +50,14 @@ type credentialData struct {
 	Issuer            string            `json:"issuer"`
 	CredentialSchema  credentialSchema  `json:"credentialSchema"`
 	CredentialSubject credentialSubject `json:"credentialSubject"`
+}
+
+// statusRequest represents the status registration API request body
+type statusRequest struct {
+	IssuerDID string `json:"issuerDid"`
+}
+
+// statusResponse represents the status registration API response
+type statusResponse struct {
+	Data vc.Status `json:"data"`
 }

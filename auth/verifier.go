@@ -122,8 +122,8 @@ func WithSpecification(spec policy.Specification) VerifyOpt {
 	}
 }
 
-// WithSchemaID expects the credential's schema ID to equal the given value.
-func WithSchemaID(schemaID string) VerifyOpt {
+// WithVerifySchemaID expects the credential's schema ID to equal the given value.
+func WithVerifySchemaID(schemaID string) VerifyOpt {
 	return func(o *verifyOptions) {
 		o.schemaID = schemaID
 	}

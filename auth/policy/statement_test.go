@@ -48,7 +48,7 @@ func TestStatement_EmptyActions(t *testing.T) {
 
 	// Create a policy to test validation
 	p := NewPolicy(
-		WithSpecification(spec),
+		WithSpecification(&spec),
 		WithStatements(s),
 	)
 
@@ -70,7 +70,7 @@ func TestStatement_EmptyResources(t *testing.T) {
 
 	// Create a policy to test validation
 	p := NewPolicy(
-		WithSpecification(spec),
+		WithSpecification(&spec),
 		WithStatements(s),
 	)
 
@@ -92,7 +92,7 @@ func TestStatement_EmptyActionsAndResources(t *testing.T) {
 
 	// Create a policy to test validation
 	p := NewPolicy(
-		WithSpecification(spec),
+		WithSpecification(&spec),
 		WithStatements(s),
 	)
 
@@ -114,7 +114,7 @@ func TestStatement_ValidWithActionsAndResources(t *testing.T) {
 
 	// Create a policy to test validation
 	p := NewPolicy(
-		WithSpecification(spec),
+		WithSpecification(&spec),
 		WithStatements(s),
 	)
 
