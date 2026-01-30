@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/signer"
+	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
@@ -27,7 +28,7 @@ type AuthBuilderConfig struct {
 
 // AuthBuilder is a builder for creating and signing VC-JWT credentials with embedded permissions.
 type AuthBuilder struct {
-	*AuthBuilderConfig
+	config *AuthBuilderConfig
 }
 
 // AuthBuilderOption is a function that configures the AuthBuilder.
@@ -40,7 +41,7 @@ func WithBuilderSchemaID(schemaID string) AuthBuilderOption {
 	}
 }
 
-// WithSignerOpti	ons sets the signer options for the AuthBuilder.
+// WithSignerOptions sets the signer options for the AuthBuilder.
 func WithSignerOptions(opts ...signer.SignOption) AuthBuilderOption {
 	return func(b *AuthBuilderConfig) {
 		b.signerOptions = opts
@@ -50,20 +51,17 @@ func WithSignerOptions(opts ...signer.SignOption) AuthBuilderOption {
 // WithSigner sets the signer for the AuthBuilder.
 func WithSigner(signer signer.Signer) AuthBuilderOption {
 	return func(b *AuthBuilderConfig) {
-		b.signer = signer
-	}
-}
-
-// WithConfig sets the config for the AuthBuilder.
-func WithConfig(config *AuthBuilderConfig) AuthBuilderOption {
-	return func(b *AuthBuilderConfig) {
-		b = config
+		if signer != nil {
+			b.signer = signer
+		}
 	}
 }
 
 // NewAuthBuilder creates a new AuthBuilder with the given options.
 func NewAuthBuilder(opts ...AuthBuilderOption) *AuthBuilder {
-	config := &AuthBuilderConfig{}
+	config := &AuthBuilderConfig{
+		signer: ecdsa.NewPrivSigner(nil),
+	}
 
 	for _, opt := range opts {
 		if opt != nil {
@@ -72,7 +70,7 @@ func NewAuthBuilder(opts ...AuthBuilderOption) *AuthBuilder {
 	}
 
 	return &AuthBuilder{
-		AuthBuilderConfig: config,
+		config: config,
 	}
 }
 
@@ -176,6 +174,10 @@ func validateAuthData(data AuthData, options *AuthBuilderConfig) error {
 		return fmt.Errorf("schema ID is required")
 	}
 
+	if options.signer == nil {
+		return fmt.Errorf("signer is required")
+	}
+
 	if data.IssuerDID == "" {
 		return fmt.Errorf("issuer DID is required")
 	}
@@ -191,15 +193,15 @@ func validateAuthData(data AuthData, options *AuthBuilderConfig) error {
 	return nil
 }
 
-// getBuilderOptions returns the builder options from the given options.
+// overrideBuilderOptions returns a deep copy of builder options with overrides applied.
 func (b *AuthBuilder) overrideBuilderOptions(opts ...AuthBuilderOption) *AuthBuilderConfig {
 	// clone the builder options, ensure not change the original builder config
 	options := &AuthBuilderConfig{
-		schemaID:      b.schemaID,
-		signer:        b.signer,
-		signerOptions: make([]signer.SignOption, len(b.signerOptions)),
+		schemaID:      b.config.schemaID,
+		signer:        b.config.signer,
+		signerOptions: make([]signer.SignOption, len(b.config.signerOptions)),
 	}
-	options.signerOptions = b.signerOptions
+	copy(options.signerOptions, b.config.signerOptions)
 
 	for _, opt := range opts {
 		if opt != nil {
