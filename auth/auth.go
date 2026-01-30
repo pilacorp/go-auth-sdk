@@ -15,65 +15,70 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/signer"
-	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-// AuthBuilder is a builder for creating and signing VC-JWT credentials with embedded permissions.
-type AuthBuilder struct {
+type AuthBuilderConfig struct {
 	schemaID      string
 	signer        signer.Signer
 	signerOptions []signer.SignOption
 }
 
+// AuthBuilder is a builder for creating and signing VC-JWT credentials with embedded permissions.
+type AuthBuilder struct {
+	*AuthBuilderConfig
+}
+
 // AuthBuilderOption is a function that configures the AuthBuilder.
-type AuthBuilderOption func(*AuthBuilder)
+type AuthBuilderOption func(*AuthBuilderConfig)
 
 // WithBuilderSchemaID sets the schema ID for the AuthBuilder.
 func WithBuilderSchemaID(schemaID string) AuthBuilderOption {
-	return func(b *AuthBuilder) {
+	return func(b *AuthBuilderConfig) {
 		b.schemaID = schemaID
 	}
 }
 
-// WithSigner sets the signer for the AuthBuilder.
-// If signer is nil, the existing signer is preserved (no-op).
-func WithSigner(signer signer.Signer) AuthBuilderOption {
-	return func(b *AuthBuilder) {
-		if signer == nil {
-			return
-		}
-		b.signer = signer
-	}
-}
-
-// WithSignerOptions sets the signer options for the AuthBuilder.
+// WithSignerOpti	ons sets the signer options for the AuthBuilder.
 func WithSignerOptions(opts ...signer.SignOption) AuthBuilderOption {
-	return func(b *AuthBuilder) {
+	return func(b *AuthBuilderConfig) {
 		b.signerOptions = opts
 	}
 }
 
-// NewAuthBuilder creates a new AuthBuilder with the given options.
-func NewAuthBuilder(schemaID string, opts ...AuthBuilderOption) *AuthBuilder {
-	builder := &AuthBuilder{
-		schemaID: schemaID,
-		signer:   ecdsa.NewPrivSigner(nil),
+// WithSigner sets the signer for the AuthBuilder.
+func WithSigner(signer signer.Signer) AuthBuilderOption {
+	return func(b *AuthBuilderConfig) {
+		b.signer = signer
 	}
+}
+
+// WithConfig sets the config for the AuthBuilder.
+func WithConfig(config *AuthBuilderConfig) AuthBuilderOption {
+	return func(b *AuthBuilderConfig) {
+		b = config
+	}
+}
+
+// NewAuthBuilder creates a new AuthBuilder with the given options.
+func NewAuthBuilder(opts ...AuthBuilderOption) *AuthBuilder {
+	config := &AuthBuilderConfig{}
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt(builder)
+			opt(config)
 		}
 	}
 
-	return builder
+	return &AuthBuilder{
+		AuthBuilderConfig: config,
+	}
 }
 
 // Build creates and signs the VC-JWT payload using the configured signer.
 func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuilderOption) (*AuthResponse, error) {
-	options := b.getBuilderOptions(opts...)
+	options := b.overrideBuilderOptions(opts...)
 
 	if err := validateAuthData(data, options); err != nil {
 		return nil, err
@@ -166,7 +171,7 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuil
 }
 
 // validateAuthData validates that the required fields in AuthData are present.
-func validateAuthData(data AuthData, options *AuthBuilder) error {
+func validateAuthData(data AuthData, options *AuthBuilderConfig) error {
 	if options.schemaID == "" {
 		return fmt.Errorf("schema ID is required")
 	}
@@ -187,16 +192,15 @@ func validateAuthData(data AuthData, options *AuthBuilder) error {
 }
 
 // getBuilderOptions returns the builder options from the given options.
-func (b *AuthBuilder) getBuilderOptions(opts ...AuthBuilderOption) *AuthBuilder {
-	// deep copy the builder options, ensure not change the original builder
-	options := &AuthBuilder{
+func (b *AuthBuilder) overrideBuilderOptions(opts ...AuthBuilderOption) *AuthBuilderConfig {
+	// clone the builder options, ensure not change the original builder config
+	options := &AuthBuilderConfig{
 		schemaID:      b.schemaID,
 		signer:        b.signer,
 		signerOptions: make([]signer.SignOption, len(b.signerOptions)),
 	}
-	copy(options.signerOptions, b.signerOptions)
+	options.signerOptions = b.signerOptions
 
-	// Apply overrides (only affects the copy)
 	for _, opt := range opts {
 		if opt != nil {
 			opt(options)

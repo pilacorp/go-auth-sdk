@@ -85,7 +85,7 @@ func TestAuthBuilder_Build(t *testing.T) {
 	}
 
 	// Build credential with all options
-	builder := NewAuthBuilder(schemaID, WithSigner(ecdsaSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID(schemaID), WithSigner(ecdsaSigner))
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
@@ -127,7 +127,7 @@ func TestAuthBuilder_WithSigner_NilPreservesDefault(t *testing.T) {
 	)
 
 	// Create builder with WithSigner(nil) - should preserve default signer
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(nil))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(nil))
 
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
@@ -153,7 +153,7 @@ func TestAuthBuilder_Build_EmptyPolicy(t *testing.T) {
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	emptyPolicy := policy.NewPolicy()
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(ecdsaSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
@@ -189,7 +189,7 @@ func TestAuthBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 		),
 	)
 
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(ecdsaSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
@@ -227,7 +227,7 @@ func TestAuthBuilder_Build_OnlyValidFrom(t *testing.T) {
 		),
 	)
 
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(ecdsaSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
@@ -252,7 +252,7 @@ func TestAuthBuilder_Build_MultipleCredentials(t *testing.T) {
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	// Build multiple credentials with same builder
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(ecdsaSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
 	holders := []string{"did:example:holder1", "did:example:holder2", "did:example:holder3"}
 	for i, holderDID := range holders {
 		testPolicy := policy.NewPolicy(
@@ -302,7 +302,7 @@ func TestAuthBuilder_Build_InvalidPrivateKey(t *testing.T) {
 
 	// Use invalid private key (too short)
 	invalidKey := []byte{1, 2, 3}
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(ecdsaSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
@@ -336,7 +336,7 @@ func TestAuthBuilder_Build_EmptyHolderDID(t *testing.T) {
 		),
 	)
 
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(ecdsaSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "", // Empty holder DID
@@ -425,7 +425,7 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 	validUntil := time.Now().Add(24 * time.Hour)
 
 	// Build credential with Vault signer
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(vaultSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(vaultSigner))
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
@@ -470,7 +470,7 @@ func TestAuthBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
 	vaultSigner := vault.NewVaultSigner(server.URL, "test-vault-token")
 
 	// Build without signer address - should fail
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(vaultSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(vaultSigner))
 	result, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
@@ -519,7 +519,7 @@ func TestAuthBuilder_Build_OverrideSigner(t *testing.T) {
 	)
 
 	// Create builder with signer1
-	builder := NewAuthBuilder("https://example.com/schema/v1", WithSigner(signer1))
+	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(signer1))
 
 	// Build with signer1 (default from builder)
 	result1, err := builder.Build(ctx, AuthData{
@@ -597,7 +597,7 @@ func TestAuthBuilder_Build_OverrideSchemaID(t *testing.T) {
 	// Create builder with schemaID1
 	schemaID1 := "https://example.com/schema/v1"
 	schemaID2 := "https://example.com/schema/v2"
-	builder := NewAuthBuilder(schemaID1, WithSigner(ecdsaSigner))
+	builder := NewAuthBuilder(WithBuilderSchemaID(schemaID1), WithSigner(ecdsaSigner))
 
 	// Build with schemaID1 (default from builder)
 	result1, err := builder.Build(ctx, AuthData{

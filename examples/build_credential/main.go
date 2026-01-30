@@ -84,7 +84,7 @@ func main() {
 	fmt.Println("✓ Created credential status")
 
 	// Step 7: Create AuthBuilder
-	builder := auth.NewAuthBuilder(schemaID, auth.WithSigner(ecdsaSigner))
+	builder := auth.NewAuthBuilder(auth.WithBuilderSchemaID(schemaID), auth.WithSigner(ecdsaSigner))
 	fmt.Println("✓ Created AuthBuilder")
 
 	// Step 8: Build the credential

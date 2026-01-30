@@ -58,7 +58,7 @@ func main() {
 	validFrom := time.Now()
 	validUntil := time.Now().Add(24 * time.Hour)
 
-	builder := auth.NewAuthBuilder(schemaID, auth.WithSigner(ecdsaSigner))
+	builder := auth.NewAuthBuilder(auth.WithBuilderSchemaID(schemaID), auth.WithSigner(ecdsaSigner))
 	result, err := builder.Build(ctx, auth.AuthData{
 		IssuerDID:        issuerDID,
 		HolderDID:        "did:example:holder",
