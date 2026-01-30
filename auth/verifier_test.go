@@ -499,7 +499,7 @@ func TestVerifyOptions_WithSpecification(t *testing.T) {
 }
 
 func TestVerifyOptions_WithSchemaID(t *testing.T) {
-	opts, err := getVerifyOptions(WithSchemaID("https://example.com/schema"))
+	opts, err := getVerifyOptions(WithVerifySchemaID("https://example.com/schema"))
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -580,7 +580,7 @@ func TestVerify_WithSchemaID_Match(t *testing.T) {
 	)
 
 	// Verify with matching schema ID
-	result, err := Verify(ctx, credJSON, WithSchemaID("https://example.com/schema"))
+	result, err := Verify(ctx, credJSON, WithVerifySchemaID("https://example.com/schema"))
 	if err != nil {
 		t.Fatalf("Verify() with matching schema ID error = %v, want nil", err)
 	}
@@ -608,7 +608,7 @@ func TestVerify_WithSchemaID_Mismatch(t *testing.T) {
 	)
 
 	// Verify with a different expected schema ID
-	_, err := Verify(ctx, credJSON, WithSchemaID("https://other.com/schema"))
+	_, err := Verify(ctx, credJSON, WithVerifySchemaID("https://other.com/schema"))
 	if err == nil {
 		t.Fatalf("Verify() with mismatched schema ID error = nil, want non-nil")
 	}

@@ -13,7 +13,7 @@ func TestStatusBuilder_CallAndLog(t *testing.T) {
 	// Use the given JWT as Authorization header (Bearer or raw depends on API config).
 	const authToken = "Bearer <issuer-access-token>"
 
-	builder := NewDefaultStatusBuilder(authToken)
+	builder := NewStatusBuilder(authToken, "https://api.ndadid.vn/api/v1/credentials/status/register")
 
 	states, err := builder.CreateStatus(context.Background(), issuerDID)
 	if err != nil {

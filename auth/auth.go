@@ -20,14 +20,62 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-// Build creates the VC-JWT payload and optionally signs it if a signer is available.
-func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...signer.SignOption) (*AuthResponse, error) {
-	// If signer is not provided, use ECDSA signer
-	if signer == nil {
-		signer = ecdsa.NewPrivSigner(nil)
+// AuthBuilder is a builder for creating and signing VC-JWT credentials with embedded permissions.
+type AuthBuilder struct {
+	schemaID      string
+	signer        signer.Signer
+	signerOptions []signer.SignOption
+}
+
+// AuthBuilderOption is a function that configures the AuthBuilder.
+type AuthBuilderOption func(*AuthBuilder)
+
+// WithBuilderSchemaID sets the schema ID for the AuthBuilder.
+func WithBuilderSchemaID(schemaID string) AuthBuilderOption {
+	return func(b *AuthBuilder) {
+		b.schemaID = schemaID
+	}
+}
+
+// WithSigner sets the signer for the AuthBuilder.
+// If signer is nil, the existing signer is preserved (no-op).
+func WithSigner(signer signer.Signer) AuthBuilderOption {
+	return func(b *AuthBuilder) {
+		if signer == nil {
+			return
+		}
+		b.signer = signer
+	}
+}
+
+// WithSignerOptions sets the signer options for the AuthBuilder.
+func WithSignerOptions(opts ...signer.SignOption) AuthBuilderOption {
+	return func(b *AuthBuilder) {
+		b.signerOptions = opts
+	}
+}
+
+// NewAuthBuilder creates a new AuthBuilder with the given options.
+func NewAuthBuilder(schemaID string, opts ...AuthBuilderOption) *AuthBuilder {
+	builder := &AuthBuilder{
+		schemaID: schemaID,
+		signer:   ecdsa.NewPrivSigner(nil),
 	}
 
-	if err := validateAuthData(data); err != nil {
+	for _, opt := range opts {
+		if opt != nil {
+			opt(builder)
+		}
+	}
+
+	return builder
+}
+
+// Build creates and signs the VC-JWT payload using the configured signer.
+func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuilderOption) (*AuthResponse, error) {
+	options := b.getBuilderOptions(opts...)
+
+	if err := validateAuthData(data, options); err != nil {
 		return nil, err
 	}
 	// Build credential subject with permissions
@@ -53,7 +101,7 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 		ID: data.ID,
 		Schemas: []vc.Schema{
 			{
-				ID:   data.SchemaID,
+				ID:   options.schemaID,
 				Type: "JsonSchema",
 			},
 		},
@@ -88,7 +136,7 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 	hash := sha256.Sum256(signData)
 
 	// Sign the credential
-	signature, err := signer.Sign(ctx, hash[:], opts...)
+	signature, err := options.signer.Sign(ctx, hash[:], options.signerOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign credential: %w", err)
 	}
@@ -118,8 +166,8 @@ func Build(ctx context.Context, data AuthData, signer signer.Signer, opts ...sig
 }
 
 // validateAuthData validates that the required fields in AuthData are present.
-func validateAuthData(data AuthData) error {
-	if data.SchemaID == "" {
+func validateAuthData(data AuthData, options *AuthBuilder) error {
+	if options.schemaID == "" {
 		return fmt.Errorf("schema ID is required")
 	}
 
@@ -136,4 +184,24 @@ func validateAuthData(data AuthData) error {
 	}
 
 	return nil
+}
+
+// getBuilderOptions returns the builder options from the given options.
+func (b *AuthBuilder) getBuilderOptions(opts ...AuthBuilderOption) *AuthBuilder {
+	// deep copy the builder options, ensure not change the original builder
+	options := &AuthBuilder{
+		schemaID:      b.schemaID,
+		signer:        b.signer,
+		signerOptions: make([]signer.SignOption, len(b.signerOptions)),
+	}
+	copy(options.signerOptions, b.signerOptions)
+
+	// Apply overrides (only affects the copy)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(options)
+		}
+	}
+
+	return options
 }

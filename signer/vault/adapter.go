@@ -24,7 +24,9 @@ func NewVaultSigner(address, token string, maxRetries ...int) signer.Signer {
 func (v *vaultSigner) Sign(ctx context.Context, payload []byte, opts ...signer.SignOption) ([]byte, error) {
 	options := &signer.SignOptions{}
 	for _, opt := range opts {
-		opt(options)
+		if opt != nil {
+			opt(options)
+		}
 	}
 
 	return v.vault.SignMessage(ctx, payload, options.SignerAddress)

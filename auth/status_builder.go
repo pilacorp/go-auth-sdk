@@ -26,19 +26,10 @@ type statusBuilder struct {
 	httpClient *http.Client
 }
 
-// NewDefaultStatusBuilder creates a default StatusBuilder that calls
-// the status registration API:
-//
-//	POST https://api.ndadid.vn/api/v1/credentials/status/register
-//
-// with body:
-//
-//	{ "issuerDid": "<issuer-did>" }
-//
-// The provided authToken will be sent in the Authorization header.
-func NewDefaultStatusBuilder(authToken string) StatusBuilder {
+// NewDefaultStatusBuilder creates a StatusBuilder that calls the configured HTTP API.
+func NewStatusBuilder(authToken string, endpoint string) StatusBuilder {
 	return &statusBuilder{
-		endpoint:  "https://api.ndadid.vn/api/v1/credentials/status/register",
+		endpoint:  endpoint,
 		authToken: authToken,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,

@@ -29,7 +29,9 @@ func NewPrivSigner(privateKey []byte) signer.Signer {
 func (p *privSigner) Sign(ctx context.Context, payload []byte, opts ...signer.SignOption) ([]byte, error) {
 	options := &signer.SignOptions{}
 	for _, opt := range opts {
-		opt(options)
+		if opt != nil {
+			opt(options)
+		}
 	}
 
 	// Determine which private key to use: opts take precedence over struct field

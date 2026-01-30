@@ -11,6 +11,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
 func main() {
@@ -70,21 +71,37 @@ func main() {
 	schemaID := "https://example.com/schema/v1"
 	fmt.Printf("✓ Using IssuerDID: %s, SchemaID: %s\n", issuerDID, schemaID)
 
-	// Step 6: Build the credential
+	// Step 6: Create credential status (required)
+	credentialStatus := []vc.Status{
+		{
+			ID:                   "https://example.com/status/0#0",
+			Type:                 "StatusList2021Entry",
+			StatusPurpose:        "revocation",
+			StatusListIndex:      "0",
+			StatusListCredential: "https://example.com/status/0",
+		},
+	}
+	fmt.Println("✓ Created credential status")
+
+	// Step 7: Create AuthBuilder
+	builder := auth.NewAuthBuilder(schemaID, auth.WithSigner(ecdsaSigner))
+	fmt.Println("✓ Created AuthBuilder")
+
+	// Step 8: Build the credential
 	holderDID := "did:example:holder"
-	result, err := auth.Build(ctx, auth.AuthData{
-		IssuerDID:  issuerDID,
-		SchemaID:   schemaID,
-		HolderDID:  holderDID,
-		Policy:     testPolicy,
-		ValidFrom:  &validFrom,
-		ValidUntil: &validUntil,
-	}, ecdsaSigner, signer.WithPrivateKey(privateKeyBytes))
+	result, err := builder.Build(ctx, auth.AuthData{
+		IssuerDID:        issuerDID,
+		HolderDID:        holderDID,
+		Policy:           testPolicy,
+		ValidFrom:        &validFrom,
+		ValidUntil:       &validUntil,
+		CredentialStatus: credentialStatus,
+	}, auth.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 	if err != nil {
 		log.Fatalf("Failed to build credential: %v", err)
 	}
 
-	// Step 7: Use the credential token
+	// Step 9: Use the credential token
 	fmt.Println("\n=== Credential Built Successfully ===")
 	fmt.Printf("Holder DID: %s\n", holderDID)
 	fmt.Printf("Credential Token: %s\n", result.Token)

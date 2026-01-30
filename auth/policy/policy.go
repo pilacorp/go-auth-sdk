@@ -34,23 +34,7 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
-	"sync"
 )
-
-var (
-	globalSpec     *Specification
-	globalSpecOnce sync.Once
-)
-
-// getGlobalSpecification returns the global singleton Specification.
-func getGlobalSpecification() *Specification {
-	globalSpecOnce.Do(func() {
-		spec := DefaultSpecification()
-		globalSpec = &spec
-	})
-
-	return globalSpec
-}
 
 // PolicyOption configures a Policy during construction.
 type PolicyOption func(*Policy)
@@ -59,14 +43,12 @@ type PolicyOption func(*Policy)
 // If specification is zero-value, the policy keeps the default specification.
 func WithSpecification(specification *Specification) PolicyOption {
 	return func(p *Policy) {
-		if len(specification.ActionObjects) == 0 &&
-			len(specification.ActionVerbs) == 0 &&
-			len(specification.ResourceObjects) == 0 {
-			p.Specification = getGlobalSpecification()
-
-			return
+		if specification == nil {
+			spec := DefaultSpecification()
+			p.Specification = &spec
+		} else {
+			p.Specification = specification
 		}
-		p.Specification = specification
 	}
 }
 
@@ -86,15 +68,19 @@ type Policy struct {
 // NewPolicy constructs a Policy from the given options.
 // If no specification option is provided, it defaults to DefaultSpecification().
 func NewPolicy(options ...PolicyOption) Policy {
-	p := Policy{
-		Specification: getGlobalSpecification(),
-	}
+	p := Policy{}
 	for _, opt := range options {
 		if opt == nil {
 			continue
 		}
 		opt(&p)
 	}
+
+	if p.Specification == nil {
+		spec := DefaultSpecification()
+		p.Specification = &spec
+	}
+
 	return p
 }
 
@@ -197,13 +183,13 @@ func (p Policy) IsValid() bool {
 		return false
 	}
 
-	spec := p.Specification
-	if spec == nil {
-		spec = getGlobalSpecification()
+	spec := DefaultSpecification()
+	if p.Specification != nil {
+		spec = *p.Specification
 	}
 
 	for _, stmt := range p.Permissions {
-		if !stmt.isValid(*spec) {
+		if !stmt.isValid(spec) {
 			return false
 		}
 	}

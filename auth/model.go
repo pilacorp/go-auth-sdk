@@ -12,12 +12,11 @@ import (
 type AuthData struct {
 	ID               string
 	IssuerDID        string
-	SchemaID         string
 	HolderDID        string
 	Policy           policy.Policy
+	CredentialStatus []vc.Status
 	ValidFrom        *time.Time
 	ValidUntil       *time.Time
-	CredentialStatus []vc.Status
 }
 
 // AuthResponse represents the result of building an authentication.
