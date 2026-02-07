@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.3.0
-	github.com/pilacorp/go-credential-sdk v1.5.1
+	github.com/pilacorp/go-credential-sdk v1.5.7
 )
 
 require (
@@ -20,5 +20,6 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792 // indirect
+	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 )
