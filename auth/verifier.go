@@ -24,6 +24,8 @@ type verifyOptions struct {
 	isCheckExpiration     bool
 	isCheckRevocation     bool
 	isValidateSchema      bool
+	schemaJSON            []byte
+	publicKeyHex          string
 	// Auth SDK specific options
 	isVerifyPermissions bool
 	specification       *policy.Specification
@@ -126,6 +128,30 @@ func WithSpecification(spec policy.Specification) VerifyOpt {
 func WithVerifySchemaID(schemaID string) VerifyOpt {
 	return func(o *verifyOptions) {
 		o.schemaID = schemaID
+	}
+}
+
+// WithPublicKeyHex sets a pre-resolved hex-encoded public key for proof verification.
+// When set, the SDK will verify proofs using this key instead of resolving it via DID.
+func WithPublicKeyHex(publicKeyHex string) VerifyOpt {
+	return func(o *verifyOptions) {
+		if publicKeyHex == "" {
+			return
+		}
+		o.publicKeyHex = publicKeyHex
+	}
+}
+
+// WithLoadedSchemaValidation enables schema validation using a pre-loaded JSON schema document.
+// When set, the SDK will validate credentials against the provided schema JSON instead of
+// fetching the schema from the credentialSchema.id URL.
+func WithLoadedSchemaValidation(schemaJSON []byte) VerifyOpt {
+	return func(o *verifyOptions) {
+		if len(schemaJSON) == 0 {
+			return
+		}
+		o.isValidateSchema = true
+		o.schemaJSON = schemaJSON
 	}
 }
 
@@ -273,11 +299,18 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 	}
 
 	if opts.isValidateSchema {
-		credOpts = append(credOpts, vc.WithSchemaValidation())
+		if len(opts.schemaJSON) > 0 {
+			credOpts = append(credOpts, vc.WithLoadedSchemaValidation(opts.schemaJSON))
+		} else {
+			credOpts = append(credOpts, vc.WithSchemaValidation())
+		}
 	}
 
 	if opts.isVerifyProof {
 		credOpts = append(credOpts, vc.WithVerifyProof())
+		if opts.publicKeyHex != "" {
+			credOpts = append(credOpts, vc.WithPublicKeyHex(opts.publicKeyHex))
+		}
 	}
 
 	if opts.isCheckExpiration {
@@ -303,6 +336,8 @@ func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
 		isCheckRevocation:     false,
 		isValidateSchema:      false,
 		isVerifyPermissions:   true,
+		schemaJSON:            nil,
+		publicKeyHex:          "",
 		specification:         &defaultSpec,
 		schemaID:              "",
 	}
