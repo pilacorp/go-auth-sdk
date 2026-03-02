@@ -141,9 +141,10 @@ func WithSchemaLoader(loader vc.SchemaLoaderFunc) VerifyOpt {
 	}
 }
 
-// WithPublicKey sets the resolver provider used for proof verification.
-// If not specified, the public key will be resolved via DID document.
-func WithPublicKey(resolver verificationmethod.ResolverProvider) VerifyOpt {
+// WithResolver sets the resolver provider used for proof verification.
+// You can create StaticResolver (pass public key) or Resolver (pass DIDUrl) or any other resolver
+// that implements verificationmethod.ResolverProvider interface.
+func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
 	return func(o *verifyOptions) {
 		o.resolver = resolver
 	}
