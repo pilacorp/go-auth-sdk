@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -24,6 +25,9 @@ type verifyOptions struct {
 	isCheckExpiration     bool
 	isCheckRevocation     bool
 	isValidateSchema      bool
+	schemaLoader          vc.SchemaLoaderFunc
+	resolver              verificationmethod.ResolverProvider
+
 	// Auth SDK specific options
 	isVerifyPermissions bool
 	specification       *policy.Specification
@@ -126,6 +130,23 @@ func WithSpecification(spec policy.Specification) VerifyOpt {
 func WithVerifySchemaID(schemaID string) VerifyOpt {
 	return func(o *verifyOptions) {
 		o.schemaID = schemaID
+	}
+}
+
+// WithSchemaLoader sets the function to load a credential schema JSON by ID.
+// If not specified, the default schema loader will be used.
+func WithSchemaLoader(loader vc.SchemaLoaderFunc) VerifyOpt {
+	return func(o *verifyOptions) {
+		o.schemaLoader = loader
+	}
+}
+
+// WithResolver sets the resolver provider used for proof verification.
+// You can create StaticResolver (pass public key) or Resolver (pass DIDUrl) or any other resolver
+// that implements verificationmethod.ResolverProvider interface.
+func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
+	return func(o *verifyOptions) {
+		o.resolver = resolver
 	}
 }
 
@@ -276,6 +297,14 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 		credOpts = append(credOpts, vc.WithSchemaValidation())
 	}
 
+	if opts.schemaLoader != nil {
+		credOpts = append(credOpts, vc.WithSchemaLoader(opts.schemaLoader))
+	}
+
+	if opts.resolver != nil {
+		credOpts = append(credOpts, vc.WithResolver(opts.resolver))
+	}
+
 	if opts.isVerifyProof {
 		credOpts = append(credOpts, vc.WithVerifyProof())
 	}
@@ -303,6 +332,8 @@ func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
 		isCheckRevocation:     false,
 		isValidateSchema:      false,
 		isVerifyPermissions:   true,
+		schemaLoader:          nil,
+		resolver:              nil,
 		specification:         &defaultSpec,
 		schemaID:              "",
 	}

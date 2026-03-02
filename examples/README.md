@@ -78,7 +78,10 @@ credentialStatus := []vc.Status{
 // Create AuthBuilder and build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-builder := auth.NewAuthBuilder("https://example.com/schema/v1", auth.WithSigner(ecdsaSigner))
+builder := auth.NewAuthBuilder(
+	auth.WithBuilderSchemaID("https://example.com/schema/v1"),
+	auth.WithSigner(ecdsaSigner),
+)
 result, _ := builder.Build(context.Background(), auth.AuthData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
