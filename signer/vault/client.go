@@ -106,7 +106,6 @@ func (v *Vault) SignMessage(ctx context.Context, payload []byte, address string)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Vault-Token", v.Token)
 		req.Header.Set("Accept", "*/*")
-		req.Header.Set("Host", v.Address)
 		req.Header.Set("Content-Length", fmt.Sprintf("%d", len(jsonBody)))
 
 		resp, err := v.httpClient.Do(req)
