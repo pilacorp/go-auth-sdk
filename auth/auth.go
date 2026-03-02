@@ -10,7 +10,6 @@ package auth
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -157,18 +156,13 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuil
 	}
 
 	// Serialize the credential to JWT string
-	document, err := vcCredential.Serialize()
+	tokenStr, err := vcCredential.Serialize()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize credential: %w", err)
 	}
 
-	documentBytes, err := json.Marshal(document)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal document: %w", err)
-	}
-
 	return &AuthResponse{
-		Token: string(documentBytes),
+		Token: tokenStr.(string),
 	}, nil
 }
 

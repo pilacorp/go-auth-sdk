@@ -26,7 +26,7 @@ type statusBuilder struct {
 	httpClient *http.Client
 }
 
-// NewDefaultStatusBuilder creates a StatusBuilder that calls the configured HTTP API.
+// NewStatusBuilder creates a StatusBuilder that calls the configured HTTP API.
 func NewStatusBuilder(authToken string, endpoint string) StatusBuilder {
 	return &statusBuilder{
 		endpoint:  endpoint,

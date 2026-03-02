@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -24,8 +25,9 @@ type verifyOptions struct {
 	isCheckExpiration     bool
 	isCheckRevocation     bool
 	isValidateSchema      bool
-	schemaJSON            []byte
-	publicKeyHex          string
+	schemaLoader          vc.SchemaLoaderFunc
+	publicKey             string
+
 	// Auth SDK specific options
 	isVerifyPermissions bool
 	specification       *policy.Specification
@@ -131,27 +133,19 @@ func WithVerifySchemaID(schemaID string) VerifyOpt {
 	}
 }
 
-// WithPublicKeyHex sets a pre-resolved hex-encoded public key for proof verification.
-// When set, the SDK will verify proofs using this key instead of resolving it via DID.
-func WithPublicKeyHex(publicKeyHex string) VerifyOpt {
+// WithSchemaLoader sets the function to load a credential schema JSON by ID.
+// If not specified, the default schema loader will be used.
+func WithSchemaLoader(loader vc.SchemaLoaderFunc) VerifyOpt {
 	return func(o *verifyOptions) {
-		if publicKeyHex == "" {
-			return
-		}
-		o.publicKeyHex = publicKeyHex
+		o.schemaLoader = loader
 	}
 }
 
-// WithLoadedSchemaValidation enables schema validation using a pre-loaded JSON schema document.
-// When set, the SDK will validate credentials against the provided schema JSON instead of
-// fetching the schema from the credentialSchema.id URL.
-func WithLoadedSchemaValidation(schemaJSON []byte) VerifyOpt {
+// WithPublicKey sets the public key for proof verification.
+// If not specified, the public key will be resolved via DID document.
+func WithPublicKey(publicKey string) VerifyOpt {
 	return func(o *verifyOptions) {
-		if len(schemaJSON) == 0 {
-			return
-		}
-		o.isValidateSchema = true
-		o.schemaJSON = schemaJSON
+		o.publicKey = publicKey
 	}
 }
 
@@ -298,19 +292,17 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 		credOpts = append(credOpts, vc.WithVerificationMethodKey(opts.verificationMethodKey))
 	}
 
-	if opts.isValidateSchema {
-		if len(opts.schemaJSON) > 0 {
-			credOpts = append(credOpts, vc.WithLoadedSchemaValidation(opts.schemaJSON))
-		} else {
-			credOpts = append(credOpts, vc.WithSchemaValidation())
-		}
+	if opts.schemaLoader != nil {
+		credOpts = append(credOpts, vc.WithSchemaLoader(opts.schemaLoader))
+	}
+
+	if opts.publicKey != "" {
+		resolver, _ := verificationmethod.NewStaticResolver(opts.publicKey)
+		credOpts = append(credOpts, vc.WithResolver(resolver))
 	}
 
 	if opts.isVerifyProof {
 		credOpts = append(credOpts, vc.WithVerifyProof())
-		if opts.publicKeyHex != "" {
-			credOpts = append(credOpts, vc.WithPublicKeyHex(opts.publicKeyHex))
-		}
 	}
 
 	if opts.isCheckExpiration {
@@ -336,8 +328,8 @@ func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
 		isCheckRevocation:     false,
 		isValidateSchema:      false,
 		isVerifyPermissions:   true,
-		schemaJSON:            nil,
-		publicKeyHex:          "",
+		schemaLoader:          nil,
+		publicKey:             "",
 		specification:         &defaultSpec,
 		schemaID:              "",
 	}
