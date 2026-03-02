@@ -10,6 +10,12 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 )
 
+type mockResolver struct{}
+
+func (m *mockResolver) GetPublicKey(_ string) (string, error) {
+	return "0x0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", nil
+}
+
 // Test helper to create a valid credential JSON with permissions
 func createTestCredentialJSON(issuerDID, holderDID string, permissions []policy.Statement) []byte {
 	cred := map[string]interface{}{
@@ -657,5 +663,75 @@ func TestBuildCredentialOptions_EmptyBaseURL(t *testing.T) {
 	if len(credOpts) > 0 {
 		// If verificationMethodKey is set, it should add that option
 		// But we can't easily verify without calling the options
+	}
+}
+
+func TestBuildCredentialOptions_WithSchemaLoader(t *testing.T) {
+	verifyOpts := &verifyOptions{
+		schemaLoader: func(schemaID string) ([]byte, error) {
+			return []byte(`{"type":"object"}`), nil
+		},
+	}
+
+	credOpts := buildCredentialOptions(verifyOpts)
+
+	if len(credOpts) != 1 {
+		t.Errorf("buildCredentialOptions() with schemaLoader returned %d options, want 1", len(credOpts))
+	}
+}
+
+func TestBuildCredentialOptions_WithPublicKey(t *testing.T) {
+	verifyOpts := &verifyOptions{
+		resolver: &mockResolver{},
+	}
+
+	credOpts := buildCredentialOptions(verifyOpts)
+
+	if len(credOpts) != 1 {
+		t.Errorf("buildCredentialOptions() with resolver returned %d options, want 1", len(credOpts))
+	}
+}
+
+func TestVerify_WithSchemaLoader(t *testing.T) {
+	ctx := context.Background()
+
+	permissions := []policy.Statement{
+		{
+			Effect:    policy.EffectAllow,
+			Actions:   []policy.Action{policy.NewAction("Issuer:Create")},
+			Resources: []policy.Resource{policy.NewResource(policy.ResourceObjectIssuer)},
+		},
+	}
+
+	credJSON := createTestCredentialJSONWithSchema(
+		"did:example:issuer",
+		"did:example:holder",
+		"https://example.com/schema",
+		permissions,
+	)
+
+	calls := 0
+	loader := func(schemaID string) ([]byte, error) {
+		calls++
+		if schemaID != "https://example.com/schema" {
+			t.Errorf("schemaLoader received schemaID = %q, want %q", schemaID, "https://example.com/schema")
+		}
+		return []byte(`{"type":"object"}`), nil
+	}
+
+	result, err := Verify(
+		ctx,
+		credJSON,
+		WithSchemaValidation(),
+		WithSchemaLoader(loader),
+	)
+	if err != nil {
+		t.Fatalf("Verify() with schema loader error = %v, want nil", err)
+	}
+	if result == nil {
+		t.Fatalf("Verify() result is nil, want non-nil")
+	}
+	if calls == 0 {
+		t.Fatalf("schemaLoader was not called")
 	}
 }

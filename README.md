@@ -88,12 +88,12 @@ p := policy.NewPolicy(
 - If a Policy is created directly (e.g., from JSON unmarshaling), methods will automatically use the default specification when `Specification` is `nil`.
 - When using `WithSpecification()`, pass a pointer (`&spec`) to allow multiple policies to share the same specification instance (memory efficient).
 
-- **CredentialStatus** (required):
+ - **CredentialStatus** (required):
   - Used to attach status information to the credential (especially for revocation checking).
   - Data type: `[]vc.Status`.
   - Each time a new credential is built, the Issuer needs **at least one status entry** corresponding to the status service, then assigns it to this field.
   - Two main approaches:
-    - **Use SDK's `StatusBuilder` interface**: implement `StatusBuilder` interface or use the default `auth.NewDefaultStatusBuilder()` which calls the status registry API and returns `[]vc.Status`.
+    - **Use SDK's `StatusBuilder` interface**: implement `StatusBuilder` interface or use the default `auth.NewStatusBuilder()` which calls the status registry API and returns `[]vc.Status`.
     - **Manually create `vc.Status` struct**: if you already have status information, simply initialize according to the template below and assign to `CredentialStatus`.
 
 **Creating Status with StatusBuilder:**
@@ -104,7 +104,10 @@ The SDK provides a `StatusBuilder` interface to help create credential status en
 
 ```go
 // Create a StatusBuilder using the default implementation
-statusBuilder := auth.NewDefaultStatusBuilder("Bearer <issuer-access-token>")
+statusBuilder := auth.NewStatusBuilder(
+	"Bearer <issuer-access-token>",
+	"https://api.ndadid.vn/api/v1/credentials/status/register",
+)
 // This calls the status registry API: POST https://api.ndadid.vn/api/v1/credentials/status/register
 
 statuses, err := statusBuilder.CreateStatus(ctx, "did:nda:testnet:0xISSUER")
@@ -232,7 +235,10 @@ resp, err := auth.Build(ctx, data, vaultSigner, signer.WithSignerAddress("0x1234
 ctx := context.Background()
 
 // Create status using StatusBuilder (see section 2 above for details)
-statusBuilder := auth.NewDefaultStatusBuilder("Bearer <issuer-access-token>")
+statusBuilder := auth.NewStatusBuilder(
+	"Bearer <issuer-access-token>",
+	"https://api.ndadid.vn/api/v1/credentials/status/register",
+)
 statuses, err := statusBuilder.CreateStatus(ctx, "did:nda:testnet:0xISSUER")
 if err != nil {
 	log.Fatalf("create status error: %v", err)
@@ -241,8 +247,8 @@ if err != nil {
 data := auth.AuthData{
 	IssuerDID: "did:nda:testnet:0xISSUER",
 	HolderDID: "did:nda:testnet:0xHOLDER",
-	Policy:    p,                 // policy.Policy from example above
-	CredentialStatus: statuses,   // required: status for this credential (see section 2)
+	Policy:    p,               // policy.Policy from example above
+	CredentialStatus: statuses, // required: status for this credential (see section 2)
 	// SchemaID: leave empty to use DefaultSchemaID
 	// ValidFrom / ValidUntil: can be set if needed
 }
@@ -271,7 +277,7 @@ result, err := auth.Verify(
 	auth.WithCheckExpiration(),              // check validity period
 	auth.WithSchemaValidation(),             // validate against schema
 	auth.WithCheckRevocation(),              // (optional) check status/revocation
-	auth.WithSchemaID(auth.DefaultSchemaID), // expect correct schema ID
+	auth.WithVerifySchemaID(auth.DefaultSchemaID), // expect correct schema ID
 	auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"), // URL to resolve DID document
 )
 if err != nil {
