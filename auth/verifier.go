@@ -292,6 +292,10 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 		credOpts = append(credOpts, vc.WithVerificationMethodKey(opts.verificationMethodKey))
 	}
 
+	if opts.isValidateSchema {
+		credOpts = append(credOpts, vc.WithSchemaValidation())
+	}
+
 	if opts.schemaLoader != nil {
 		credOpts = append(credOpts, vc.WithSchemaLoader(opts.schemaLoader))
 	}
