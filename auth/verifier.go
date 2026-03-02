@@ -26,7 +26,7 @@ type verifyOptions struct {
 	isCheckRevocation     bool
 	isValidateSchema      bool
 	schemaLoader          vc.SchemaLoaderFunc
-	publicKey             string
+	resolver              verificationmethod.ResolverProvider
 
 	// Auth SDK specific options
 	isVerifyPermissions bool
@@ -141,11 +141,11 @@ func WithSchemaLoader(loader vc.SchemaLoaderFunc) VerifyOpt {
 	}
 }
 
-// WithPublicKey sets the public key for proof verification.
+// WithPublicKey sets the resolver provider used for proof verification.
 // If not specified, the public key will be resolved via DID document.
-func WithPublicKey(publicKey string) VerifyOpt {
+func WithPublicKey(resolver verificationmethod.ResolverProvider) VerifyOpt {
 	return func(o *verifyOptions) {
-		o.publicKey = publicKey
+		o.resolver = resolver
 	}
 }
 
@@ -300,9 +300,8 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 		credOpts = append(credOpts, vc.WithSchemaLoader(opts.schemaLoader))
 	}
 
-	if opts.publicKey != "" {
-		resolver, _ := verificationmethod.NewStaticResolver(opts.publicKey)
-		credOpts = append(credOpts, vc.WithResolver(resolver))
+	if opts.resolver != nil {
+		credOpts = append(credOpts, vc.WithResolver(opts.resolver))
 	}
 
 	if opts.isVerifyProof {
@@ -333,7 +332,7 @@ func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
 		isValidateSchema:      false,
 		isVerifyPermissions:   true,
 		schemaLoader:          nil,
-		publicKey:             "",
+		resolver:              nil,
 		specification:         &defaultSpec,
 		schemaID:              "",
 	}

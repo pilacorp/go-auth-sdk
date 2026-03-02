@@ -10,6 +10,12 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 )
 
+type mockResolver struct{}
+
+func (m *mockResolver) GetPublicKey(_ string) (string, error) {
+	return "0x0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", nil
+}
+
 // Test helper to create a valid credential JSON with permissions
 func createTestCredentialJSON(issuerDID, holderDID string, permissions []policy.Statement) []byte {
 	cred := map[string]interface{}{
@@ -676,13 +682,13 @@ func TestBuildCredentialOptions_WithSchemaLoader(t *testing.T) {
 
 func TestBuildCredentialOptions_WithPublicKey(t *testing.T) {
 	verifyOpts := &verifyOptions{
-		publicKey: "0x0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+		resolver: &mockResolver{},
 	}
 
 	credOpts := buildCredentialOptions(verifyOpts)
 
 	if len(credOpts) != 1 {
-		t.Errorf("buildCredentialOptions() with publicKey returned %d options, want 1", len(credOpts))
+		t.Errorf("buildCredentialOptions() with resolver returned %d options, want 1", len(credOpts))
 	}
 }
 
