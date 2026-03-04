@@ -86,6 +86,10 @@ func TestDefaultSpecification(t *testing.T) {
 		ActionObjectDid,
 		ActionObjectSchema,
 		ActionObjectCredential,
+		ActionObjectPresentation,
+		ActionObjectAccessibleCredential,
+		ActionObjectProvider,
+		ActionObjectBaseSchema,
 	}
 	for _, obj := range knownActionObjects {
 		found := false
@@ -102,10 +106,13 @@ func TestDefaultSpecification(t *testing.T) {
 
 	// Test ActionVerbs contain known values
 	knownActionVerbs := []ActionVerb{
+		ActionVerbGet,
 		ActionVerbCreate,
 		ActionVerbUpdate,
 		ActionVerbDelete,
 		ActionVerbRevoke,
+		ActionVerbUpdateInfo,
+		ActionVerbUpdatePermissions,
 	}
 	for _, verb := range knownActionVerbs {
 		found := false
@@ -148,6 +155,10 @@ func TestDefaultSpecification(t *testing.T) {
 		ResourceObjectDid,
 		ResourceObjectSchema,
 		ResourceObjectCredential,
+		ResourceObjectPresentation,
+		ResourceObjectAccessibleCredential,
+		ResourceObjectProvider,
+		ResourceObjectBaseSchema,
 	}
 	for _, obj := range knownResourceObjects {
 		found := false
