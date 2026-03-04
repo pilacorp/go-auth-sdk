@@ -14,6 +14,7 @@ const (
 
 // Predefined action verbs that can be used in actions.
 const (
+	ActionVerbGet                    ActionVerb = "Get"
 	ActionVerbCreate                 ActionVerb = "Create"
 	ActionVerbUpdate                 ActionVerb = "Update"
 	ActionVerbDelete                 ActionVerb = "Delete"
