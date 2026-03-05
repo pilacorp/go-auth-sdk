@@ -1,5 +1,10 @@
 ## Go Auth SDK
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/pilacorp/go-auth-sdk.svg)](https://pkg.go.dev/github.com/pilacorp/go-auth-sdk)
+[![Go Report Card](https://goreportcard.com/badge/github.com/pilacorp/go-auth-sdk?style=flat-square)](https://goreportcard.com/report/github.com/pilacorp/go-auth-sdk)
+[![Release](https://img.shields.io/github/v/release/pilacorp/go-auth-sdk?include_prereleases&style=flat-square)](https://github.com/pilacorp/go-auth-sdk/releases)
+[![License](https://img.shields.io/github/license/pilacorp/go-auth-sdk.svg?style=flat-square)](https://github.com/pilacorp/go-auth-sdk/blob/main/LICENSE)
+
 Go **Auth SDK** standardizes **Authentication + Authorization** using **Verifiable Credentials (VC)** (VC-JWT), enabling services in the ecosystem to share a consistent security model.
 
 ### Features
