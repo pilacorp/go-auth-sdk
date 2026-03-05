@@ -161,8 +161,13 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuil
 		return nil, fmt.Errorf("failed to serialize credential: %w", err)
 	}
 
+	token, ok := tokenStr.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid token type: expected string")
+	}
+
 	return &AuthResponse{
-		Token: tokenStr.(string),
+		Token: token,
 	}, nil
 }
 

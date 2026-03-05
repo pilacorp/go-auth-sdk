@@ -1,0 +1,64 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Released]
+
+## [v1.0.4]
+
+### Added
+- Action verb "get" support in policy
+
+## [v1.0.3]
+
+### Added
+- Public key options for credential verification
+- Schema loader for credential verification
+
+### Updated
+- go-credential-sdk to v1.5.8
+
+## [v1.0.2]
+
+### Added
+- Enhanced verifier options with public key and schema validation support
+
+### Updated
+- go-credential-sdk to v1.5.7
+
+## [v1.0.1]
+
+### Added
+- License file (MIT)
+
+## [v1.0.0]
+
+### Added
+- Initial release of Go Auth SDK
+- Policy-based permissions for fine-grained authorization
+- VC-JWT credential building and verification
+- ECDSA signer for local private key signing
+- Vault signer for remote signing service
+- Status integration (revocation) support with `credentialStatus`
+- Schema validation for credentials
+- AuthBuilder for credential creation
+
+### Features
+- `auth.Build()` - Build Verifiable Credentials (VC-JWT)
+- `auth.Verify()` - Verify VC-JWT and extract permissions
+- `policy.NewPolicy()` - Create authorization policies
+- `signer/ecdsa` - ECDSA local private key signer
+- `signer/vault` - Vault remote signer
+- `StatusBuilder` interface for credential status creation
+
+### Refactored
+- Renamed `WithPublicKey` to `WithResolver` for clarity on resolver options
+- Replaced public key with resolver provider in verifier options
+- Renamed `AuthBuilderOption` to `AuthBuilderConfigOption`
+- Modified `AuthBuilder` to use dedicated config field
+- Updated `AuthBuilder` initialization to use `WithBuilderSchemaID`
+### Fixed
+- Removed unnecessary Host header from SignMessage request in Vault client
