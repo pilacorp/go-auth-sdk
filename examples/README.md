@@ -51,18 +51,14 @@ import (
 privateKey, _ := crypto.GenerateKey()
 privateKeyBytes := crypto.FromECDSA(privateKey)
 
-// Create signer and policy
-ecdsaSigner := ecdsa.NewPrivSigner(nil)
-testPolicy := policy.NewPolicy(
-    policy.WithStatements(
-        policy.NewStatement(
-            policy.EffectAllow,
-            []policy.Action{policy.NewAction("Credential:Create")},
-            []policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
-            policy.NewCondition(),
-        ),
-    ),
+// Create policy
+stmt := policy.NewStatement(
+    policy.EffectAllow,
+    []policy.Action{policy.NewAction("Credential:Create")},
+    []policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+    policy.NewCondition(),
 )
+testPolicy := policy.NewPolicy(policy.WithStatements(stmt))
 
 // Create credential status (required)
 credentialStatus := []vc.Status{
@@ -75,14 +71,19 @@ credentialStatus := []vc.Status{
     },
 }
 
-// Create AuthBuilder and build credential
+// Create signer
+ecdsaSigner := ecdsa.NewPrivSigner(nil)
+
+// Create AuthBuilder
+builder := auth.NewAuthBuilder(
+    auth.WithBuilderSchemaID("https://example.com/schema/v1"),
+    auth.WithSigner(ecdsaSigner),
+)
+
+// Build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-builder := auth.NewAuthBuilder(
-	auth.WithBuilderSchemaID("https://example.com/schema/v1"),
-	auth.WithSigner(ecdsaSigner),
-)
-result, _ := builder.Build(context.Background(), auth.AuthData{
+result, err := builder.Build(context.Background(), auth.AuthData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
@@ -90,15 +91,16 @@ result, _ := builder.Build(context.Background(), auth.AuthData{
     ValidUntil:       &validUntil,
     CredentialStatus: credentialStatus,
 }, auth.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+
+if err != nil {
+    // Handle error
+}
 ```
 
 ### Verifying a Credential
 
 ```go
-import (
-    "context"
-    "github.com/pilacorp/go-auth-sdk/auth"
-)
+import "github.com/pilacorp/go-auth-sdk/auth"
 
 result, err := auth.Verify(
     context.Background(),
@@ -107,4 +109,9 @@ result, err := auth.Verify(
     auth.WithCheckExpiration(),
     auth.WithDIDBaseURL("https://api.example.com/did"),
 )
+if err != nil {
+    // Handle error
+}
+
+// Use result.IssuerDID, result.HolderDID, result.Permissions
 ```
