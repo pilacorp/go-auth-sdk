@@ -42,7 +42,6 @@ go get github.com/pilacorp/go-auth-sdk
 type AuthData struct {
 	ID               string        // optional: credential ID, SDK auto-generates UUID if empty
 	IssuerDID        string        // required: Issuer DID (the credential signer)
-	SchemaID         string        // optional: schema ID; uses DefaultSchemaID if empty
 	HolderDID        string        // required: Holder DID (credentialSubject.id)
 	Policy           policy.Policy // required: permissions list
 	ValidFrom        *time.Time    // optional: credential validity start time
@@ -53,13 +52,7 @@ type AuthData struct {
 
 - **IssuerDID**: DID of the system issuing the credential (e.g., Issuer service DID).
 - **HolderDID**: DID of the user/subject who will hold the credential.
-- **SchemaID**:
-  - Used to validate credential structure on the verifier side.
-  - If not provided, SDK uses the pre-configured `DefaultSchemaID` constant:
-
-```go
-const DefaultSchemaID = "https://auth-dev.pila.vn/api/v1/schemas/e8429e35-5486-4f05-a06c-2bd211f99fc8"
-```
+- **SchemaID**: Set via `WithBuilderSchemaID()` when creating the AuthBuilder.
 
 - **Policy**: list of statements describing permissions. Policies should be created using `policy.NewPolicy()` to ensure proper initialization:
 
@@ -198,7 +191,7 @@ import "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 // Private key must be passed via signer.WithPrivateKey() when calling Build()
-resp, err := auth.Build(ctx, data, ecdsaSigner, signer.WithPrivateKey(myPrivKeyBytes))
+resp, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithPrivateKey(myPrivKeyBytes)))
 ```
 
 **Method 2: Initialize with embedded key**
@@ -208,9 +201,9 @@ import "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 
 ecdsaSigner := ecdsa.NewPrivSigner(myPrivKeyBytes)
 // Can use the embedded key, or override with signer.WithPrivateKey()
-resp, err := auth.Build(ctx, data, ecdsaSigner) // use key from struct
+resp, err := builder.Build(ctx, data) // use key from struct
 // or
-resp, err := auth.Build(ctx, data, ecdsaSigner, signer.WithPrivateKey(anotherKey)) // override with different key
+resp, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithPrivateKey(anotherKey))) // override with different key
 ```
 
 **Private key priority:**
@@ -227,7 +220,7 @@ import "github.com/pilacorp/go-auth-sdk/signer/vault"
 
 vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
 // Signer address must be passed via signer.WithSignerAddress() when calling Build()
-resp, err := auth.Build(ctx, data, vaultSigner, signer.WithSignerAddress("0x1234..."))
+resp, err := builder.Build(ctx, data, signer.WithSignerAddress("0x1234..."))
 ```
 
 **Note:**
@@ -249,25 +242,42 @@ if err != nil {
 	log.Fatalf("create status error: %v", err)
 }
 
-data := auth.AuthData{
-	IssuerDID: "did:nda:testnet:0xISSUER",
-	HolderDID: "did:nda:testnet:0xHOLDER",
-	Policy:    p,               // policy.Policy from example above
-	CredentialStatus: statuses, // required: status for this credential (see section 2)
-	// SchemaID: leave empty to use DefaultSchemaID
-	// ValidFrom / ValidUntil: can be set if needed
-}
+// Create policy
+stmt := policy.NewStatement(
+	policy.EffectAllow,
+	[]policy.Action{policy.NewAction("Credential:Create")},
+	[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+	policy.NewCondition(),
+)
+p := policy.NewPolicy(policy.WithStatements(stmt))
 
-// signer: can be ECDSA signer or Vault signer (see section 3 above)
+// Create signer
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
-resp, err := auth.Build(ctx, data, ecdsaSigner, signer.WithPrivateKey(myPrivKeyBytes))
+// Create AuthBuilder with schema ID
+builder := auth.NewAuthBuilder(
+	auth.WithBuilderSchemaID("https://example.com/schema/v1"),
+	auth.WithSigner(ecdsaSigner),
+)
+
+// Build credential
+validFrom := time.Now()
+validUntil := time.Now().Add(24 * time.Hour)
+result, err := builder.Build(ctx, auth.AuthData{
+	IssuerDID:        "did:nda:testnet:0xISSUER",
+	HolderDID:        "did:nda:testnet:0xHOLDER",
+	Policy:           p,
+	ValidFrom:        &validFrom,
+	ValidUntil:       &validUntil,
+	CredentialStatus: statuses,
+}, auth.WithSignerOptions(signer.WithPrivateKey(myPrivKeyBytes)))
+
 if err != nil {
 	log.Fatalf("build credential error: %v", err)
 }
 
-// resp.Token is the VC-JWT (JSON/JWT string) that you return to the client/holder.
-fmt.Println("VC-JWT:", resp.Token)
+// result.Token is the VC-JWT (JSON/JWT string) that you return to the client/holder.
+fmt.Println("VC-JWT:", result.Token)
 ```
 
 #### 5. Verify Credential (Check VC-JWT + Extract Permissions)
@@ -277,12 +287,12 @@ ctx := context.Background()
 
 result, err := auth.Verify(
 	ctx,
-	[]byte(resp.Token),
+	[]byte(credentialToken),
 	auth.WithVerifyProof(),                  // enable signature verification
 	auth.WithCheckExpiration(),              // check validity period
 	auth.WithSchemaValidation(),             // validate against schema
 	auth.WithCheckRevocation(),              // (optional) check status/revocation
-	auth.WithVerifySchemaID(auth.DefaultSchemaID), // expect correct schema ID
+	auth.WithVerifySchemaID("https://example.com/schema/v1"), // expect correct schema ID
 	auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"), // URL to resolve DID document
 )
 if err != nil {

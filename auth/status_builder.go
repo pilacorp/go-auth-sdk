@@ -26,15 +26,38 @@ type statusBuilder struct {
 	httpClient *http.Client
 }
 
+// StatusBuilderOption configures a statusBuilder instance.
+type StatusBuilderOption func(*statusBuilder)
+
+// WithStatusBuilderHTTPClient sets a custom HTTP client for the status builder.
+// If not provided, a default client with a 10s timeout is used.
+func WithStatusBuilderHTTPClient(client *http.Client) StatusBuilderOption {
+	return func(sb *statusBuilder) {
+		if client != nil {
+			sb.httpClient = client
+		}
+	}
+}
+
 // NewStatusBuilder creates a StatusBuilder that calls the configured HTTP API.
-func NewStatusBuilder(authToken string, endpoint string) StatusBuilder {
-	return &statusBuilder{
+// By default it uses an http.Client with a 10s timeout, which can be
+// overridden via StatusBuilderOption values.
+func NewStatusBuilder(authToken string, endpoint string, opts ...StatusBuilderOption) StatusBuilder {
+	sb := &statusBuilder{
 		endpoint:  endpoint,
 		authToken: authToken,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(sb)
+		}
+	}
+
+	return sb
 }
 
 // CreateStatus implements StatusBuilder by calling the configured HTTP API.
