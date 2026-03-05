@@ -1,14 +1,14 @@
 # Makefile for go-auth-sdk
 # Standard commands for building, testing, and maintaining the SDK
 
-.PHONY: help test test-coverage build lint format vet security-check clean install tidy
+.PHONY: help test test-coverage clean
 
 # Default target
 help:
 	@echo "go-auth-sdk Makefile"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  test            - Run all unit tests"
+	@echo "  test           - Run all unit tests"
 	@echo "  test-coverage  - Run tests with coverage report"
 	@echo "  clean          - Clean build artifacts"
 

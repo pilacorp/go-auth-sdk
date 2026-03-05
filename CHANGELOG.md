@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Released]
 
+## [v1.0.5]
+
+### Added
+- Configurable HTTP client for `StatusBuilder` via `StatusBuilderOption` and `WithStatusBuilderHTTPClient()`
+- Add tests in folder /test
+
+### Updated
+- Documentation (`README.md`, `AGENT.md`) to describe `StatusBuilder` options and HTTP client customization
+
 ## [v1.0.4]
 
 ### Added
