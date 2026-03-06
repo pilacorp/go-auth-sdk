@@ -154,21 +154,18 @@ func TestAuthBuilder_Build_EmptyPolicy(t *testing.T) {
 
 	emptyPolicy := policy.NewPolicy()
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
-	result, err := builder.Build(ctx, AuthData{
+	_, err := builder.Build(ctx, AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
 		Policy:           emptyPolicy,
 		CredentialStatus: getDefaultTestStatus(),
 	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 
-	if err != nil {
-		t.Fatalf("Build() with empty policy should succeed: %v", err)
+	if err == nil {
+		t.Fatal("Build() with empty policy should fail")
 	}
-	if result == nil {
-		t.Fatal("Build() should return result even with empty policy")
-	}
-	if result.Token == "" {
-		t.Error("Build() should return non-empty token even with empty policy")
+	if err.Error() != "permissions are required" {
+		t.Errorf("Build() error = %v, want 'permissions are required'", err)
 	}
 }
 

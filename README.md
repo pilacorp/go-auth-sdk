@@ -219,8 +219,8 @@ Vault signer signs credentials through a Vault service (suitable for production,
 import "github.com/pilacorp/go-auth-sdk/signer/vault"
 
 vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
-// Signer address must be passed via signer.WithSignerAddress() when calling Build()
-resp, err := builder.Build(ctx, data, signer.WithSignerAddress("0x1234..."))
+// Signer address must be passed via auth.WithSignerOptions(...) when calling Build()
+resp, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
 ```
 
 **Note:**

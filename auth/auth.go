@@ -193,6 +193,10 @@ func validateAuthData(data AuthData, options *AuthBuilderConfig) error {
 		return fmt.Errorf("credential status is required")
 	}
 
+	if len(data.Policy.Permissions) == 0 {
+		return fmt.Errorf("permissions are required")
+	}
+
 	return nil
 }
 
