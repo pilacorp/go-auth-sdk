@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Released]
 
+## [v1.0.6]
+
+### Fixed
+- Update Document
+
+### Changed
+- Build validation: `Build()` now requires permissions in Policy - returns error "permissions are required" if empty
+
 ## [v1.0.5]
 
 ### Added
