@@ -112,10 +112,11 @@ func (v *Vault) SignMessage(ctx context.Context, payload []byte, address string)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send request: %w", err)
 		}
-		defer resp.Body.Close()
 
 		// Read response body for error details
 		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close() // Close immediately to prevent connection leak during retries
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response: %w", err)
 		}
