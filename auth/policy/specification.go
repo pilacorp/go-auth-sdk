@@ -30,6 +30,7 @@ func DefaultSpecification() Specification {
 			ActionObjectBaseSchema,
 		},
 		ActionVerbs: []ActionVerb{
+			ActionVerbGet,
 			ActionVerbCreate,
 			ActionVerbUpdate,
 			ActionVerbDelete,
