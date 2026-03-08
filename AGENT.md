@@ -174,7 +174,7 @@ result, err := builder.Build(ctx, auth.AuthData{
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
     CredentialStatus: credentialStatus,
-}, signer.WithSignerAddress("0x1234..."))
+}, auth.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
 ```
 
 ## Error Handling
@@ -201,19 +201,37 @@ result, err := builder.Build(ctx, auth.AuthData{
 
 ### Available Action Objects
 - `policy.ActionObjectIssuer` - Issuer operations
+- `policy.ActionObjectDid` - DID operations
+- `policy.ActionObjectSchema` - Schema operations
 - `policy.ActionObjectCredential` - Credential operations
-- `policy.ActionObjectAll` - All objects
+- `policy.ActionObjectPresentation` - Presentation operations
+- `policy.ActionObjectAccessibleCredential` - AccessibleCredential operations
+- `policy.ActionObjectProvider` - Provider operations
+- `policy.ActionObjectBaseSchema` - BaseSchema operations
 
 ### Available Action Verbs
 - `policy.ActionVerbCreate` - Create
 - `policy.ActionVerbUpdate` - Update
 - `policy.ActionVerbDelete` - Delete
-- `policy.ActionVerbRead` - Read
+- `policy.ActionVerbRevoke` - Revoke
+- `policy.ActionVerbUpdateInfo` - UpdateInfo
+- `policy.ActionVerbUpdatePermissions` - UpdatePermissions
+- `policy.ActionVerbGrantCreate` - GrantCreate
+- `policy.ActionVerbGrantUpdate` - GrantUpdate
+- `policy.ActionVerbGrantDelete` - GrantDelete
+- `policy.ActionVerbGrantRevoke` - GrantRevoke
+- `policy.ActionVerbGrantUpdateInfo` - GrantUpdateInfo
+- `policy.ActionVerbGrantUpdatePermissions` - GrantUpdatePermissions
 
 ### Available Resource Objects
 - `policy.ResourceObjectIssuer` - Issuer resource
+- `policy.ResourceObjectDid` - DID resource
+- `policy.ResourceObjectSchema` - Schema resource
 - `policy.ResourceObjectCredential` - Credential resource
-- `policy.ResourceObjectAll` - All resources
+- `policy.ResourceObjectPresentation` - Presentation resource
+- `policy.ResourceObjectAccessibleCredential` - AccessibleCredential resource
+- `policy.ResourceObjectProvider` - Provider resource
+- `policy.ResourceObjectBaseSchema` - BaseSchema resource
 
 ### Creating Actions/Resources
 
@@ -243,7 +261,7 @@ result, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithPrivat
 
 ```go
 vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
-result, err := builder.Build(ctx, data, signer.WithSignerAddress("0x1234..."))
+result, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
 ```
 
 ## Verify Options
