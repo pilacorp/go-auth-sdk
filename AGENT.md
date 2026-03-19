@@ -4,7 +4,7 @@ This document provides guidance for AI coding assistants (LLMs) working with the
 
 ## Overview
 
-Go Auth SDK provides authentication and authorization using Verifiable Credentials (VC-JWT). It enables services to share a consistent security model with policy-based permissions.
+Go Auth SDK provides authentication and authorization using Verifiable Credentials (VC-JWT) and Verifiable Presentations (VP-JWT). It enables services to share a consistent security model with policy-based permissions.
 
 **Module:** `github.com/pilacorp/go-auth-sdk`
 **Go Version:** 1.24.6+
@@ -16,6 +16,8 @@ go-auth-sdk/
 ├── auth/                    # Main API for building/verifying VC-JWT
 │   ├── auth.go             # AuthBuilder - build credentials
 │   ├── verifier.go         # Verify - verify credentials
+│   ├── vp_builder.go       # VPBuilder - build presentations
+│   ├── vp_verifier.go      # VerifyPresentation - verify presentations
 │   ├── model.go            # Data types (AuthData, VerifyResult)
 │   ├── status_builder.go  # StatusBuilder interface for revocation
 │   └── policy/            # Policy/permission types
@@ -111,7 +113,53 @@ if err != nil {
 // Use result.IssuerDID, result.HolderDID, result.Permissions
 ```
 
-### Pattern 3: Custom Status Builder
+### Pattern 3: Build a Presentation from Multiple VC Tokens (Holder)
+
+```go
+import (
+    "context"
+    "github.com/pilacorp/go-auth-sdk/auth"
+    "github.com/pilacorp/go-auth-sdk/signer"
+    "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+)
+
+vpSigner := ecdsa.NewPrivSigner(nil)
+vpBuilder := auth.NewVPBuilder(
+    auth.WithVPSigner(vpSigner),
+)
+
+vpResp, err := vpBuilder.Build(context.Background(), auth.VPData{
+    HolderDID: "did:example:holder",
+    VCTokens:  []string{vcToken1, vcToken2},
+}, auth.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)))
+if err != nil {
+    // Handle error
+}
+
+// vpResp.Token contains VP-JWT
+```
+
+### Pattern 4: Verify a Presentation and Aggregate Permissions (Service)
+
+```go
+import "github.com/pilacorp/go-auth-sdk/auth"
+
+vpResult, err := auth.VerifyPresentation(
+    ctx,
+    []byte(vpToken),
+    auth.WithVPVerifyProof(),
+    auth.WithVPCheckExpiration(),
+    auth.WithVPValidateCredentials(),
+    auth.WithVPDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+)
+if err != nil {
+    // Handle error
+}
+
+// Use vpResult.HolderDID, vpResult.AllPermissions
+```
+
+### Pattern 5: Custom Status Builder
 
 ```go
 import "github.com/pilacorp/go-auth-sdk/auth"
@@ -141,7 +189,7 @@ statusBuilder := &MyStatusBuilder{BaseURL: "...", AuthToken: "..."}
 statuses, err := statusBuilder.CreateStatus(ctx, issuerDID)
 ```
 
-### Pattern 4: Policy with Custom Specification
+### Pattern 6: Policy with Custom Specification
 
 ```go
 // Use custom specification for different action/resource rules
@@ -157,7 +205,7 @@ p := policy.NewPolicy(
 )
 ```
 
-### Pattern 5: Using Vault Signer
+### Pattern 7: Using Vault Signer
 
 ```go
 import "github.com/pilacorp/go-auth-sdk/signer/vault"
@@ -277,6 +325,16 @@ result, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithSigner
 | `WithVerificationMethodKey(key)` | Verification method key (default: "key-1") |
 | `WithSpecification(spec)` | Custom policy specification |
 | `WithResolver(resolver)` | Custom DID resolver |
+
+## VP Verify Options
+
+| Option | Purpose |
+|--------|---------|
+| `WithVPVerifyProof()` | Verify VP cryptographic signature/proof |
+| `WithVPCheckExpiration()` | Check VP validity period |
+| `WithVPValidateCredentials()` | Enable embedded VC validation in parser |
+| `WithVPDIDBaseURL(url)` | DID resolution endpoint for VP proof/VC verification |
+| `WithVPVerificationMethodKey(key)` | Verification method key (default: `key-1`) |
 
 ## Testing Notes
 

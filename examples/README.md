@@ -31,6 +31,15 @@ Shows how to create and validate policies with different configurations.
 go run examples/create_policy/main.go
 ```
 
+### 4. Verify Presentation
+
+Shows end-to-end presentation flow: issue multiple VCs, create VP-JWT from them, then verify VP and aggregate permissions.
+
+**Run:**
+```bash
+go run examples/verify_presentation/main.go
+```
+
 ## Quick Start
 
 ### Building a Credential
@@ -114,4 +123,38 @@ if err != nil {
 }
 
 // Use result.IssuerDID, result.HolderDID, result.Permissions
+```
+
+### Building and Verifying a Presentation
+
+```go
+// Build VP-JWT from one or many VC-JWT tokens
+vpBuilder := auth.NewVPBuilder(auth.WithVPSigner(ecdsa.NewPrivSigner(nil)))
+
+vpResp, err := vpBuilder.Build(
+    context.Background(),
+    auth.VPData{
+        HolderDID: "did:example:holder",
+        VCTokens:  []string{vcToken1, vcToken2},
+    },
+    auth.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)),
+)
+if err != nil {
+    // Handle error
+}
+
+// Verify VP-JWT and aggregate permissions from embedded VCs
+vpResult, err := auth.VerifyPresentation(
+    context.Background(),
+    []byte(vpResp.Token),
+    auth.WithVPVerifyProof(),
+    auth.WithVPCheckExpiration(),
+    auth.WithVPDIDBaseURL("https://api.example.com/did"),
+)
+if err != nil {
+    // Handle error
+}
+
+// Use vpResult.HolderDID, vpResult.AllPermissions
+_ = vpResult
 ```
