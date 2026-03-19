@@ -3,8 +3,8 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/signer"
@@ -83,16 +83,6 @@ func (b *VPBuilder) Build(ctx context.Context, data VPData, opts ...VPBuilderCon
 		data.ID = uuid.NewString()
 	}
 
-	// Determine validity window
-	validFrom := time.Now()
-	validUntil := time.Now().Add(5 * time.Minute)
-	if data.ValidFrom != nil {
-		validFrom = *data.ValidFrom
-	}
-	if data.ValidUntil != nil {
-		validUntil = *data.ValidUntil
-	}
-
 	// Build presentation contents
 	contents := vp.PresentationContents{
 		Context: []interface{}{
@@ -101,9 +91,15 @@ func (b *VPBuilder) Build(ctx context.Context, data VPData, opts ...VPBuilderCon
 		ID:                    data.ID,
 		Types:                 []string{"VerifiablePresentation"},
 		Holder:                data.HolderDID,
-		ValidFrom:             validFrom,
-		ValidUntil:            validUntil,
 		VerifiableCredentials: credentials,
+	}
+
+	// Set optional validity fields
+	if data.ValidFrom != nil {
+		contents.ValidFrom = *data.ValidFrom
+	}
+	if data.ValidUntil != nil {
+		contents.ValidUntil = *data.ValidUntil
 	}
 
 	// Create JWT presentation
@@ -118,8 +114,11 @@ func (b *VPBuilder) Build(ctx context.Context, data VPData, opts ...VPBuilderCon
 		return nil, fmt.Errorf("failed to get presentation signing input: %w", err)
 	}
 
+	// Signer expects a 32-byte digest.
+	hash := sha256.Sum256(signingInput)
+
 	// Sign using the configured signer
-	signature, err := options.signer.Sign(ctx, signingInput, options.signerOptions...)
+	signature, err := options.signer.Sign(ctx, hash[:], options.signerOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign presentation: %w", err)
 	}

@@ -65,14 +65,11 @@ type statusResponse struct {
 // VPData holds the data needed to build a Verifiable Presentation.
 // It contains references to VCs (as tokens or objects) and metadata.
 type VPData struct {
-	ID         string        // optional: presentation ID, SDK auto-generates UUID if empty
-	HolderDID  string        // required: Holder DID (presenter)
-	VCTokens   []string      // required: list of VC-JWT tokens to embed
-	ValidFrom  *time.Time    // optional: presentation validity start time
-	ValidUntil *time.Time    // optional: presentation validity end time
-	Audience   string        // optional: expected API audience for verification
-	Nonce      string        // optional: nonce for replay protection
-	CacheTTL   time.Duration // optional: suggested cache TTL for presenter
+	ID         string     // optional: presentation ID, SDK auto-generates UUID if empty
+	HolderDID  string     // required: Holder DID (presenter)
+	VCTokens   []string   // required: list of VC-JWT tokens to embed
+	ValidFrom  *time.Time // optional: presentation validity start time
+	ValidUntil *time.Time // optional: presentation validity end time
 }
 
 // VPResponse represents the result of building a Verifiable Presentation.

@@ -3,8 +3,10 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
@@ -125,14 +127,14 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 
 	// Verify audience if requested
 	if verifyOpts.isVerifyAudience {
-		if err := verifyPresentationAudience(parsedVP, verifyOpts.expectedAudience); err != nil {
+		if err := verifyPresentationAudience(parsedVP, presentation, verifyOpts.expectedAudience); err != nil {
 			return nil, err
 		}
 	}
 
 	// Verify nonce if requested
 	if verifyOpts.isVerifyNonce {
-		if err := verifyPresentationNonce(parsedVP, verifyOpts.expectedNonce); err != nil {
+		if err := verifyPresentationNonce(parsedVP, presentation, verifyOpts.expectedNonce); err != nil {
 			return nil, err
 		}
 	}
@@ -218,7 +220,7 @@ func extractHolderDID(parsedVP vp.Presentation) (string, error) {
 }
 
 // verifyPresentationAudience verifies that the presentation's audience matches expected value.
-func verifyPresentationAudience(parsedVP vp.Presentation, expectedAudience string) error {
+func verifyPresentationAudience(parsedVP vp.Presentation, rawPresentation []byte, expectedAudience string) error {
 	contents, err := parsedVP.GetContents()
 	if err != nil {
 		return fmt.Errorf("failed to get presentation contents: %w", err)
@@ -231,7 +233,18 @@ func verifyPresentationAudience(parsedVP vp.Presentation, expectedAudience strin
 
 	audienceRaw, ok := data["aud"]
 	if !ok || audienceRaw == nil {
-		return fmt.Errorf("audience (aud) claim not found in presentation")
+		jwtClaims, err := parseJWTPresentationClaims(rawPresentation)
+		if err != nil {
+			return err
+		}
+
+		if jwtClaims != nil {
+			audienceRaw = jwtClaims["aud"]
+		}
+
+		if audienceRaw == nil {
+			return fmt.Errorf("audience (aud) claim not found in presentation")
+		}
 	}
 
 	audience, ok := audienceRaw.(string)
@@ -247,7 +260,7 @@ func verifyPresentationAudience(parsedVP vp.Presentation, expectedAudience strin
 }
 
 // verifyPresentationNonce verifies that the presentation's nonce matches expected value.
-func verifyPresentationNonce(parsedVP vp.Presentation, expectedNonce string) error {
+func verifyPresentationNonce(parsedVP vp.Presentation, rawPresentation []byte, expectedNonce string) error {
 	contents, err := parsedVP.GetContents()
 	if err != nil {
 		return fmt.Errorf("failed to get presentation contents: %w", err)
@@ -260,7 +273,18 @@ func verifyPresentationNonce(parsedVP vp.Presentation, expectedNonce string) err
 
 	nonceRaw, ok := data["nonce"]
 	if !ok || nonceRaw == nil {
-		return fmt.Errorf("nonce claim not found in presentation")
+		jwtClaims, err := parseJWTPresentationClaims(rawPresentation)
+		if err != nil {
+			return err
+		}
+
+		if jwtClaims != nil {
+			nonceRaw = jwtClaims["nonce"]
+		}
+
+		if nonceRaw == nil {
+			return fmt.Errorf("nonce claim not found in presentation")
+		}
 	}
 
 	nonce, ok := nonceRaw.(string)
@@ -273,6 +297,26 @@ func verifyPresentationNonce(parsedVP vp.Presentation, expectedNonce string) err
 	}
 
 	return nil
+}
+
+func parseJWTPresentationClaims(rawPresentation []byte) (map[string]interface{}, error) {
+	parts := strings.Split(string(rawPresentation), ".")
+	if len(parts) != 3 {
+		// JSON presentations are allowed; no top-level JWT claims available.
+		return nil, nil
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode jwt payload: %w", err)
+	}
+
+	claims := make(map[string]interface{})
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal jwt payload: %w", err)
+	}
+
+	return claims, nil
 }
 
 // verifyEmbeddedVCs extracts and verifies all embedded VCs in the presentation.
