@@ -72,8 +72,8 @@ func TestVerifyPresentation_ValidPresentation(t *testing.T) {
 		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
 	}
 
-	if len(result.AllPermissions) == 0 {
-		t.Fatalf("expected non-empty permissions in result")
+	if len(result.EmbeddedVCData) == 0 {
+		t.Fatalf("expected non-empty embedded VC data in result")
 	}
 }
 
@@ -371,9 +371,9 @@ func TestVerifyPresentation_MultipleVCsPermissions(t *testing.T) {
 		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
 	}
 
-	// Multiple VCs should aggregate permissions
-	if len(result.AllPermissions) == 0 {
-		t.Fatalf("expected non-empty permissions from multiple VCs")
+	// Multiple VCs should have multiple verification results
+	if len(result.EmbeddedVCData) == 0 {
+		t.Fatalf("expected non-empty embedded VC data from multiple VCs")
 	}
 }
 
@@ -593,8 +593,6 @@ func TestVerifyPresentation_AllOptions(t *testing.T) {
 		WithVPVerifyProof(),
 		WithVPCheckExpiration(),
 		WithVPValidateCredentials(),
-		WithVPVerifyAudience("test-api"),
-		WithVPVerifyNonce("test-nonce-123"),
 		WithVPDIDBaseURL(didBaseURL),
 		WithVPVerificationMethodKey("key-1"),
 	)
@@ -610,8 +608,8 @@ func TestVerifyPresentation_AllOptions(t *testing.T) {
 		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
 	}
 
-	if len(result.AllPermissions) == 0 {
-		t.Fatalf("expected non-empty permissions with all options")
+	if len(result.EmbeddedVCData) == 0 {
+		t.Fatalf("expected non-empty embedded VC data with all options")
 	}
 }
 
@@ -726,8 +724,6 @@ func TestGetVPVerifyOptions_Override(t *testing.T) {
 		WithVPVerifyProof(),
 		WithVPCheckExpiration(),
 		WithVPValidateCredentials(),
-		WithVPVerifyAudience("my-aud"),
-		WithVPVerifyNonce("my-nonce"),
 	)
 
 	if opts.didBaseURL != "https://custom.did/api/v1/did" {
@@ -748,22 +744,6 @@ func TestGetVPVerifyOptions_Override(t *testing.T) {
 
 	if !opts.isValidateVC {
 		t.Fatal("isValidateVC should be true")
-	}
-
-	if !opts.isVerifyAudience {
-		t.Fatal("isVerifyAudience should be true")
-	}
-
-	if opts.expectedAudience != "my-aud" {
-		t.Fatalf("expectedAudience mismatch: got %q", opts.expectedAudience)
-	}
-
-	if !opts.isVerifyNonce {
-		t.Fatal("isVerifyNonce should be true")
-	}
-
-	if opts.expectedNonce != "my-nonce" {
-		t.Fatalf("expectedNonce mismatch: got %q", opts.expectedNonce)
 	}
 }
 

@@ -143,7 +143,7 @@ if err != nil {
     // Handle error
 }
 
-// Verify VP-JWT and aggregate permissions from embedded VCs
+// Verify VP-JWT and extract verification results from embedded VCs
 vpResult, err := auth.VerifyPresentation(
     context.Background(),
     []byte(vpResp.Token),
@@ -155,6 +155,10 @@ if err != nil {
     // Handle error
 }
 
-// Use vpResult.HolderDID, vpResult.AllPermissions
-_ = vpResult
+// Process each embedded VC's verification result
+// Callers can implement custom aggregation logic based on business needs
+for i, vcResult := range vpResult.EmbeddedVCData {
+    _ = i
+    _ = vcResult // Use as needed: IssuerDID, HolderDID, Permissions
+}
 ```

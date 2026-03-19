@@ -347,7 +347,13 @@ if err != nil {
 }
 
 fmt.Println("Holder DID:", vpResult.HolderDID)
-fmt.Printf("Aggregated Permissions: %+v\n", vpResult.AllPermissions)
+
+// Process each embedded VC's verification result
+// Implement custom aggregation/conflict resolution based on business logic
+for i, vcResult := range vpResult.EmbeddedVCData {
+	fmt.Printf("VC[%d] from %s:\n", i, vcResult.IssuerDID)
+	fmt.Printf("  Permissions: %+v\n", vcResult.Permissions)
+}
 ```
 
 Optional anti-replay checks:

@@ -134,19 +134,21 @@ func TestVerifyPresentationFlow(t *testing.T) {
 		t.Fatalf("holder DID mismatch: got %q want %q", result.HolderDID, holderDID)
 	}
 
-	if len(result.AllPermissions) != 2 {
-		t.Fatalf("permissions count mismatch: got %d want 2", len(result.AllPermissions))
+	if len(result.EmbeddedVCData) != 2 {
+		t.Fatalf("embedded VC count mismatch: got %d want 2", len(result.EmbeddedVCData))
 	}
 
 	actions := map[string]bool{}
-	for _, stmt := range result.AllPermissions {
-		for _, a := range stmt.Actions {
-			actions[a.String()] = true
+	for _, vcResult := range result.EmbeddedVCData {
+		for _, stmt := range vcResult.Permissions {
+			for _, a := range stmt.Actions {
+				actions[a.String()] = true
+			}
 		}
 	}
 
 	if !actions["Credential:Create"] {
-		t.Fatalf("missing action Credential:Create in aggregated permissions")
+		t.Fatalf("missing action Credential:Create in embedded VC permissions")
 	}
 	if !actions["Credential:Update"] {
 		t.Fatalf("missing action Credential:Update in aggregated permissions")

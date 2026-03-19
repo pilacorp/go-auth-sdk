@@ -24,7 +24,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Full Verify Presentation Flow ===\n")
+	fmt.Println("=== Full Verify Presentation Flow ===")
 
 	// Step 1: Generate issuer and holder keys
 	issuerKeyBytes, err := mustGeneratePrivateKey()
@@ -210,17 +210,23 @@ func main() {
 	// Step 9: Display VP Response
 	fmt.Println("\n=== Verification Complete ===")
 	fmt.Printf("Holder DID: %s\n", vpResult.HolderDID)
-	fmt.Printf("Total Aggregated Permissions: %d\n", len(vpResult.AllPermissions))
+	fmt.Printf("Total Embedded VCs: %d\n", len(vpResult.EmbeddedVCData))
 
-	fmt.Println("\nAggregated Permission Statements:")
-	for i, stmt := range vpResult.AllPermissions {
-		fmt.Printf("  Statement[%d]:\n", i)
-		fmt.Printf("    Effect: %v\n", stmt.Effect)
-		for j, action := range stmt.Actions {
-			fmt.Printf("    Action[%d]: %s\n", j, action)
-		}
-		for j, resource := range stmt.Resources {
-			fmt.Printf("    Resource[%d]: %s\n", j, resource)
+	fmt.Println("\nEmbedded VC Verification Results:")
+	for i, vcResult := range vpResult.EmbeddedVCData {
+		fmt.Printf("  VC[%d]:\n", i)
+		fmt.Printf("    Issuer DID: %s\n", vcResult.IssuerDID)
+		fmt.Printf("    Holder DID: %s\n", vcResult.HolderDID)
+		fmt.Printf("    Permissions (Statements): %d\n", len(vcResult.Permissions))
+		for j, stmt := range vcResult.Permissions {
+			fmt.Printf("      Statement[%d]:\n", j)
+			fmt.Printf("        Effect: %v\n", stmt.Effect)
+			for k, action := range stmt.Actions {
+				fmt.Printf("        Action[%d]: %s\n", k, action)
+			}
+			for k, resource := range stmt.Resources {
+				fmt.Printf("        Resource[%d]: %s\n", k, resource)
+			}
 		}
 	}
 

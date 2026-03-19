@@ -78,9 +78,9 @@ type VPResponse struct {
 }
 
 // VPVerifyResult represents the normalized result of presentation verification.
-// It contains the extracted holder DID and all verified permissions from embedded VCs.
+// It contains the extracted holder DID and VerifyResult objects for each embedded VC.
+// This structure allows callers to implement custom aggregation and conflict resolution logic.
 type VPVerifyResult struct {
-	HolderDID      string             // The holder DID from the presentation
-	EmbeddedVCData []*VerifyResult    // Results from verifying each embedded VC
-	AllPermissions []policy.Statement // Aggregated permissions from all VCs
+	HolderDID      string          // The holder DID from the presentation
+	EmbeddedVCData []*VerifyResult // Results from verifying each embedded VC
 }

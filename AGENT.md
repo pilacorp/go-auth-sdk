@@ -139,7 +139,7 @@ if err != nil {
 // vpResp.Token contains VP-JWT
 ```
 
-### Pattern 4: Verify a Presentation and Aggregate Permissions (Service)
+### Pattern 4: Verify a Presentation and Handle Embedded VCs (Service)
 
 ```go
 import "github.com/pilacorp/go-auth-sdk/auth"
@@ -156,7 +156,16 @@ if err != nil {
     // Handle error
 }
 
-// Use vpResult.HolderDID, vpResult.AllPermissions
+// Access holder DID
+holderDID := vpResult.HolderDID
+
+// Process each embedded VC's verification result independently
+// Implement custom aggregation/conflict resolution based on business logic
+for i, vcResult := range vpResult.EmbeddedVCData {
+    issuerDID := vcResult.IssuerDID
+    permissions := vcResult.Permissions
+    // Apply business-specific logic for combining permissions
+}
 ```
 
 ### Pattern 5: Custom Status Builder
