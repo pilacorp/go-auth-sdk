@@ -72,8 +72,13 @@ func TestVerifyPresentation_ValidPresentation(t *testing.T) {
 		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
 	}
 
-	if len(result.EmbeddedVCData) == 0 {
-		t.Fatalf("expected non-empty embedded VC data in result")
+	if len(result.VC) == 0 {
+		t.Fatalf("expected non-empty VC data in result")
+	}
+
+	// Verify the VC token is correct
+	if result.VC[0].Token != vcToken {
+		t.Fatalf("VC token mismatch")
 	}
 }
 
@@ -321,10 +326,10 @@ func TestVerifyPresentation_NotYetValid(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Multiple VCs, permissions, and result-structure tests
+// Multiple VCs and result-structure tests
 // ---------------------------------------------------------------------------
 
-func TestVerifyPresentation_MultipleVCsPermissions(t *testing.T) {
+func TestVerifyPresentation_MultipleVCs(t *testing.T) {
 	ctx := context.Background()
 
 	issuerPriv, _ := crypto.GenerateKey()
@@ -336,6 +341,7 @@ func TestVerifyPresentation_MultipleVCsPermissions(t *testing.T) {
 	issuerDID := "did:test:issuer"
 	holderDID := "did:test:holder"
 
+	// Create test DID server
 	didServer := newTestDIDServer(t, issuerDID, issuerKeyBytes, holderDID, holderKeyBytes)
 	defer didServer.Close()
 
@@ -343,7 +349,7 @@ func TestVerifyPresentation_MultipleVCsPermissions(t *testing.T) {
 	vp.Init(didBaseURL)
 	vc.Init(didBaseURL)
 
-	// Create two VCs with different permissions
+	// Create multiple VCs
 	vcToken1 := createTestVCToken(t, issuerDID, holderDID, issuerKeyBytes)
 	vcToken2 := createTestVCToken(t, issuerDID, holderDID, issuerKeyBytes)
 
@@ -371,60 +377,14 @@ func TestVerifyPresentation_MultipleVCsPermissions(t *testing.T) {
 		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
 	}
 
-	// Multiple VCs should have multiple verification results
-	if len(result.EmbeddedVCData) == 0 {
-		t.Fatalf("expected non-empty embedded VC data from multiple VCs")
-	}
-}
-
-func TestVerifyPresentation_NoPermissions(t *testing.T) {
-	// AuthBuilder requires permissions, so we cannot create a VC without policy.
-	// This test verifies that a VP built with a VC that has an empty permissions
-	// array (not nil) still verifies correctly.
-	ctx := context.Background()
-
-	issuerPriv, _ := crypto.GenerateKey()
-	issuerKeyBytes := crypto.FromECDSA(issuerPriv)
-
-	holderPriv, _ := crypto.GenerateKey()
-	holderKeyBytes := crypto.FromECDSA(holderPriv)
-
-	issuerDID := "did:test:issuer"
-	holderDID := "did:test:holder"
-
-	didServer := newTestDIDServer(t, issuerDID, issuerKeyBytes, holderDID, holderKeyBytes)
-	defer didServer.Close()
-
-	didBaseURL := didServer.URL + "/api/v1/did"
-	vp.Init(didBaseURL)
-	vc.Init(didBaseURL)
-
-	// VC with policy (permissions are required by builder)
-	vcToken := createTestVCToken(t, issuerDID, holderDID, issuerKeyBytes)
-
-	ecdsaSigner := ecdsasigner.NewPrivSigner(nil)
-	vpBuilder := NewVPBuilder(WithVPSigner(ecdsaSigner))
-
-	vpResp, err := vpBuilder.Build(ctx, VPData{
-		ID:        "urn:uuid:test-vp-no-perms",
-		HolderDID: holderDID,
-		VCTokens:  []string{vcToken},
-	}, WithVPSignerOptions(signer.WithPrivateKey(holderKeyBytes)))
-	if err != nil {
-		t.Fatalf("build vp failed: %v", err)
+	// Multiple VCs should produce multiple tokens
+	if len(result.VC) != 2 {
+		t.Fatalf("expected 2 VCs, got %d", len(result.VC))
 	}
 
-	result, err := VerifyPresentation(ctx, []byte(vpResp.Token),
-		WithVPDIDBaseURL(didBaseURL),
-		WithVPVerificationMethodKey("key-1"),
-	)
-	if err != nil {
-		t.Fatalf("VerifyPresentation() error = %v", err)
-	}
-
-	// Should succeed
-	if result.HolderDID != holderDID {
-		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
+	// Verify token ordering
+	if result.VC[0].Token != vcToken1 || result.VC[1].Token != vcToken2 {
+		t.Fatalf("VC tokens mismatch")
 	}
 }
 
@@ -469,76 +429,6 @@ func TestVerifyPresentation_WithProofVerification(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatalf("VerifyPresentation() with proof verification error = %v", err)
-	}
-
-	if result.HolderDID != holderDID {
-		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
-	}
-}
-
-func TestVerifyPresentation_WithVCValidation(t *testing.T) {
-	// Note: WithVPValidateCredentials requires the schema endpoint to be reachable.
-	// The test helper sets schema ID to "https://example.com/schema/v1", which
-	// is not served by our mock DID server. So we test WithVPValidateCredentials
-	// by verifying that the option is correctly propagated to vpVerifyOptions,
-	// and that VerifyPresentation still succeeds at parsing the presentation.
-	// (The actual VC schema validation happens inside the credential SDK which
-	// would need a real/reachable schema server.)
-	ctx := context.Background()
-
-	issuerPriv, _ := crypto.GenerateKey()
-	issuerKeyBytes := crypto.FromECDSA(issuerPriv)
-
-	holderPriv, _ := crypto.GenerateKey()
-	holderKeyBytes := crypto.FromECDSA(holderPriv)
-
-	issuerDID := "did:test:issuer"
-	holderDID := "did:test:holder"
-
-	didServer := newTestDIDServer(t, issuerDID, issuerKeyBytes, holderDID, holderKeyBytes)
-	defer didServer.Close()
-
-	didBaseURL := didServer.URL + "/api/v1/did"
-	vp.Init(didBaseURL)
-	vc.Init(didBaseURL)
-
-	vcToken := createTestVCToken(t, issuerDID, holderDID, issuerKeyBytes)
-
-	ecdsaSigner := ecdsasigner.NewPrivSigner(nil)
-	vpBuilder := NewVPBuilder(WithVPSigner(ecdsaSigner))
-
-	vpResp, err := vpBuilder.Build(ctx, VPData{
-		ID:        "urn:uuid:test-vp",
-		HolderDID: holderDID,
-		VCTokens:  []string{vcToken},
-	}, WithVPSignerOptions(signer.WithPrivateKey(holderKeyBytes)))
-	if err != nil {
-		t.Fatalf("build vp failed: %v", err)
-	}
-
-	// Verify the option is correctly set (isValidateVC=true)
-	opts := getVPVerifyOptions(
-		WithVPValidateCredentials(),
-		WithVPDIDBaseURL(didBaseURL),
-	)
-	if !opts.isValidateVC {
-		t.Fatal("WithVPValidateCredentials should set isValidateVC=true")
-	}
-
-	// Verify buildVPOptions produces the WithVCValidation option
-	vpOpts := buildVPOptions(opts)
-	if len(vpOpts) < 3 {
-		t.Fatalf("buildVPOptions should produce WithVCValidation option, got %d opts", len(vpOpts))
-	}
-
-	// VerifyPresentation still works at parsing/presentation level without the
-	// full VC validation chain
-	result, err := VerifyPresentation(ctx, []byte(vpResp.Token),
-		WithVPDIDBaseURL(didBaseURL),
-		WithVPVerificationMethodKey("key-1"),
-	)
-	if err != nil {
-		t.Fatalf("VerifyPresentation() error = %v", err)
 	}
 
 	if result.HolderDID != holderDID {
@@ -592,7 +482,6 @@ func TestVerifyPresentation_AllOptions(t *testing.T) {
 	result, err := VerifyPresentation(ctx, []byte(vpResp.Token),
 		WithVPVerifyProof(),
 		WithVPCheckExpiration(),
-		WithVPValidateCredentials(),
 		WithVPDIDBaseURL(didBaseURL),
 		WithVPVerificationMethodKey("key-1"),
 	)
@@ -608,8 +497,8 @@ func TestVerifyPresentation_AllOptions(t *testing.T) {
 		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
 	}
 
-	if len(result.EmbeddedVCData) == 0 {
-		t.Fatalf("expected non-empty embedded VC data with all options")
+	if len(result.VC) == 0 {
+		t.Fatalf("expected non-empty VC data with all options")
 	}
 }
 
@@ -723,7 +612,6 @@ func TestGetVPVerifyOptions_Override(t *testing.T) {
 		WithVPVerificationMethodKey("my-key"),
 		WithVPVerifyProof(),
 		WithVPCheckExpiration(),
-		WithVPValidateCredentials(),
 	)
 
 	if opts.didBaseURL != "https://custom.did/api/v1/did" {
@@ -740,10 +628,6 @@ func TestGetVPVerifyOptions_Override(t *testing.T) {
 
 	if !opts.isCheckExpiration {
 		t.Fatal("isCheckExpiration should be true")
-	}
-
-	if !opts.isValidateVC {
-		t.Fatal("isValidateVC should be true")
 	}
 }
 
@@ -762,7 +646,6 @@ func TestBuildVPOptions(t *testing.T) {
 		verificationMethodKey: "my-key",
 		isVerifyProof:         true,
 		isCheckExpiration:     true,
-		isValidateVC:          true,
 	}
 
 	vpOpts := buildVPOptions(opts)
@@ -796,84 +679,70 @@ func TestBuildVPOptions_Partial(t *testing.T) {
 	}
 }
 
-type mockVPResolver struct {
-	publicKey string
-}
+func TestExtractVCTokens(t *testing.T) {
+	// Test with string tokens
+	vpData := map[string]interface{}{
+		"holder": "did:test:holder",
+		"verifiableCredential": []interface{}{
+			"token1",
+			"token2",
+		},
+	}
 
-func (m *mockVPResolver) GetPublicKey(_ string) (string, error) {
-	return m.publicKey, nil
-}
-
-func TestVerifyPresentation_WithResolver(t *testing.T) {
-	ctx := context.Background()
-
-	issuerPriv, _ := crypto.GenerateKey()
-	issuerKeyBytes := crypto.FromECDSA(issuerPriv)
-
-	holderPriv, _ := crypto.GenerateKey()
-	holderKeyBytes := crypto.FromECDSA(holderPriv)
-
-	issuerDID := "did:test:issuer"
-	holderDID := "did:test:holder"
-
-	// Create test DID server
-	didServer := newTestDIDServer(t, issuerDID, issuerKeyBytes, holderDID, holderKeyBytes)
-	defer didServer.Close()
-
-	didBaseURL := didServer.URL + "/api/v1/did"
-	vc.Init(didBaseURL)
-	vp.Init(didBaseURL)
-
-	vcToken := createTestVCToken(t, issuerDID, holderDID, issuerKeyBytes)
-
-	ecdsaSigner := ecdsasigner.NewPrivSigner(nil)
-	vpBuilder := NewVPBuilder(WithVPSigner(ecdsaSigner))
-
-	vpResp, err := vpBuilder.Build(ctx, VPData{
-		ID:        "urn:uuid:test-vp-resolver",
-		HolderDID: holderDID,
-		VCTokens:  []string{vcToken},
-	}, WithVPSignerOptions(signer.WithPrivateKey(holderKeyBytes)))
+	tokens, err := extractVCTokens(vpData)
 	if err != nil {
-		t.Fatalf("build vp failed: %v", err)
+		t.Fatalf("extractVCTokens() error = %v", err)
 	}
 
-	// Create resolver that returns the issuer's actual public key (used for VC proof verification)
-	issuerPK, _ := crypto.ToECDSA(issuerKeyBytes)
-	issuerPubKeyBytes := crypto.FromECDSAPub(&issuerPK.PublicKey)
-	issuerPubKey := "0x" + hex.EncodeToString(issuerPubKeyBytes)
-	issuerResolver := &mockVPResolver{publicKey: issuerPubKey}
-
-	// Verify with resolver - should bypass DID URL resolution for embedded VCs
-	result, err := VerifyPresentation(ctx, []byte(vpResp.Token),
-		WithVPVerifyProof(),
-		WithVPDIDBaseURL(didBaseURL),
-		WithVPVerificationMethodKey("key-1"),
-		WithVPResolver(issuerResolver),
-	)
-	if err != nil {
-		t.Fatalf("VerifyPresentation() with resolver error = %v", err)
+	if len(tokens) != 2 {
+		t.Fatalf("expected 2 tokens, got %d", len(tokens))
 	}
 
-	if result == nil {
-		t.Fatalf("VerifyPresentation() returned nil result")
-	}
-
-	if result.HolderDID != holderDID {
-		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
-	}
-
-	if len(result.EmbeddedVCData) == 0 {
-		t.Fatalf("expected non-empty embedded VC data")
+	if tokens[0].Token != "token1" || tokens[1].Token != "token2" {
+		t.Fatalf("tokens mismatch")
 	}
 }
 
-func TestGetVPVerifyOptions_WithResolver(t *testing.T) {
-	opts := getVPVerifyOptions(
-		WithVPResolver(&mockVPResolver{publicKey: "0x0400000000"}),
-	)
+func TestExtractVCTokens_Empty(t *testing.T) {
+	vpData := map[string]interface{}{
+		"holder": "did:test:holder",
+	}
 
-	if opts.resolver == nil {
-		t.Fatal("resolver should be set when WithVPResolver is used")
+	_, err := extractVCTokens(vpData)
+	if err == nil {
+		t.Fatalf("extractVCTokens() should return error for missing verifiableCredential")
 	}
 }
+
+func TestExtractVCTokens_InvalidArray(t *testing.T) {
+	vpData := map[string]interface{}{
+		"holder":                "did:test:holder",
+		"verifiableCredential": "not-an-array",
+	}
+
+	_, err := extractVCTokens(vpData)
+	if err == nil {
+		t.Fatalf("extractVCTokens() should return error for non-array verifiableCredential")
+	}
+}
+
+func TestExtractVCTokens_ObjectVC(t *testing.T) {
+	// Test that object VC (non-string) returns an error
+	vcObject := map[string]interface{}{
+		"@context": []string{"https://www.w3.org/ns/credentials/v2"},
+		"id":       "urn:uuid:test-vc",
+		"issuer":   "did:test:issuer",
+		"type":     []string{"VerifiableCredential"},
+	}
+
+	vpData := map[string]interface{}{
+		"holder":                "did:test:holder",
+		"verifiableCredential":   []interface{}{vcObject},
+	}
+
+	_, err := extractVCTokens(vpData)
+	if err == nil {
+		t.Fatalf("extractVCTokens() should return error for non-string VC")
+	}
+}
+

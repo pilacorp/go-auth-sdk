@@ -33,7 +33,7 @@ go run examples/create_policy/main.go
 
 ### 4. Verify Presentation
 
-Shows end-to-end presentation flow: issue multiple VCs, create VP-JWT from them, then verify VP and aggregate permissions.
+Shows end-to-end presentation flow: issue multiple VCs, create VP-JWT from them, then verify VP and parse/verify each embedded VC independently.
 
 **Run:**
 ```bash
@@ -143,7 +143,7 @@ if err != nil {
     // Handle error
 }
 
-// Verify VP-JWT and extract verification results from embedded VCs
+// Verify VP-JWT (only VP-level verification, does NOT auto-verify embedded VCs)
 vpResult, err := auth.VerifyPresentation(
     context.Background(),
     []byte(vpResp.Token),
@@ -155,10 +155,17 @@ if err != nil {
     // Handle error
 }
 
-// Process each embedded VC's verification result
-// Callers can implement custom aggregation logic based on business needs
-for i, vcResult := range vpResult.EmbeddedVCData {
-    _ = i
+// Verify each embedded VC independently based on your business logic
+for i, vc := range vpResult.VC {
+    vcResult, err := auth.Verify(ctx, []byte(vc.Token),
+        auth.WithVerifyProof(),
+        auth.WithCheckExpiration(),
+        auth.WithVerifyPermissions(),
+        auth.WithDIDBaseURL("https://api.example.com/did"),
+    )
+    if err != nil {
+        // Handle error per VC
+    }
     _ = vcResult // Use as needed: IssuerDID, HolderDID, Permissions
 }
 ```

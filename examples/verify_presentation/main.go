@@ -210,24 +210,47 @@ func main() {
 	// Step 9: Display VP Response
 	fmt.Println("\n=== Verification Complete ===")
 	fmt.Printf("Holder DID: %s\n", vpResult.HolderDID)
-	fmt.Printf("Total Embedded VCs: %d\n", len(vpResult.EmbeddedVCData))
+	fmt.Printf("Total Embedded VCs: %d\n", len(vpResult.VC))
 
-	fmt.Println("\nEmbedded VC Verification Results:")
-	for i, vcResult := range vpResult.EmbeddedVCData {
-		fmt.Printf("  VC[%d]:\n", i)
-		fmt.Printf("    Issuer DID: %s\n", vcResult.IssuerDID)
-		fmt.Printf("    Holder DID: %s\n", vcResult.HolderDID)
-		fmt.Printf("    Permissions (Statements): %d\n", len(vcResult.Permissions))
-		for j, stmt := range vcResult.Permissions {
-			fmt.Printf("      Statement[%d]:\n", j)
-			fmt.Printf("        Effect: %v\n", stmt.Effect)
-			for k, action := range stmt.Actions {
-				fmt.Printf("        Action[%d]: %s\n", k, action)
-			}
-			for k, resource := range stmt.Resources {
-				fmt.Printf("        Resource[%d]: %s\n", k, resource)
-			}
+	fmt.Println("\nEmbedded VC Tokens (callers should parse/verify each VC based on their business logic):")
+	for i, vc := range vpResult.VC {
+		// Truncate long tokens for display
+		tokenDisplay := vc.Token
+		if len(tokenDisplay) > 50 {
+			tokenDisplay = tokenDisplay[:50] + "..."
 		}
+		fmt.Printf("  VC[%d]: %s\n", i, tokenDisplay)
+	}
+
+	// Step 10: Parse and verify each embedded VC token
+	fmt.Println("\n--- Parsing and Verifying Embedded VCs ---")
+	for i, vcResp := range vpResult.VC {
+		token := vcResp.Token
+
+		if _, err := vc.ParseCredential([]byte(token)); err != nil {
+			log.Fatalf("parse embedded vc[%d] failed: %v", i, err)
+		}
+		fmt.Printf("✓ Parsed embedded VC[%d]\n", i)
+
+		vcVerifyResult, err := auth.Verify(
+			ctx,
+			[]byte(token),
+			auth.WithVerifyProof(),
+			auth.WithCheckExpiration(),
+			auth.WithDIDBaseURL(didBaseURL),
+			auth.WithVerificationMethodKey("key-1"),
+			auth.WithVerifyPermissions(),
+		)
+		if err != nil {
+			log.Fatalf("verify embedded vc[%d] failed: %v", i, err)
+		}
+
+		fmt.Printf("✓ Verified embedded VC[%d] - issuer=%s holder=%s permissions=%d\n",
+			i,
+			vcVerifyResult.IssuerDID,
+			vcVerifyResult.HolderDID,
+			len(vcVerifyResult.Permissions),
+		)
 	}
 
 	fmt.Println("\n✅ Full presentation verification flow completed successfully!")

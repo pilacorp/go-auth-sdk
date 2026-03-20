@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
 )
 
@@ -19,8 +18,6 @@ type vpVerifyOptions struct {
 	verificationMethodKey string
 	isVerifyProof         bool
 	isCheckExpiration     bool
-	isValidateVC          bool
-	resolver              verificationmethod.ResolverProvider
 }
 
 // WithVPDIDBaseURL sets the DID base URL for presentation verification.
@@ -59,38 +56,14 @@ func WithVPCheckExpiration() VPVerifyOpt {
 	}
 }
 
-// WithVPValidateCredentials enables validation of embedded VCs in the presentation.
-// When enabled, all embedded credentials are parsed and validated.
-func WithVPValidateCredentials() VPVerifyOpt {
-	return func(o *vpVerifyOptions) {
-		o.isValidateVC = true
-	}
-}
-
-// WithVPResolver sets the resolver provider used for proof verification of embedded VCs.
-// You can create StaticResolver (pass public key directly) or Resolver (resolve via DID URL)
-// that implements verificationmethod.ResolverProvider interface.
-// This bypasses DID URL resolution and improves performance by using a pre-configured public key.
-func WithVPResolver(resolver verificationmethod.ResolverProvider) VPVerifyOpt {
-	return func(o *vpVerifyOptions) {
-		o.resolver = resolver
-	}
-}
-
-// VerifyPresentation performs comprehensive verification of a Verifiable Presentation.
-// It performs the following checks as enabled:
-//   - Parsing the presentation (supports both JWT and JSON-LD formats)
-//   - Validating the presentation structure
-//   - Verifying proof/signature (if WithVPVerifyProof is enabled)
-//   - Checking expiration (if WithVPCheckExpiration is enabled)
-//   - Validating embedded credentials (if WithVPValidateCredentials is enabled)
-//   - Verifying audience claim (if WithVPVerifyAudience is enabled)
-//   - Verifying nonce claim (if WithVPVerifyNonce is enabled)
-//   - Extracting and verifying all embedded VCs
+// VerifyPresentation parses a Verifiable Presentation and extracts the holder DID
+// and raw VC tokens. It performs VP-level verification (proof and expiration)
+// if enabled via options.
+//
+// Callers should parse and verify each VC token based on their own business logic.
 //
 // The function returns a VPVerifyResult containing the holder DID and
-// VerifyResult objects for each embedded VC, allowing callers to apply
-// custom aggregation and conflict resolution logic, or an error if verification fails.
+// raw VC tokens, or an error if verification fails.
 func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVerifyOpt) (*VPVerifyResult, error) {
 	if len(presentation) == 0 {
 		return nil, fmt.Errorf("presentation is empty")
@@ -124,15 +97,15 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 		return nil, fmt.Errorf("failed to extract holder DID: %w", err)
 	}
 
-	// Extract and verify all embedded VCs
-	embeddedVCResults, err := verifyEmbeddedVCs(ctx, vpData, verifyOpts.resolver, verifyOpts.didBaseURL, verifyOpts.verificationMethodKey)
+	// Extract all embedded VC tokens
+	vcTokens, err := extractVCTokens(vpData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify embedded credentials: %w", err)
+		return nil, fmt.Errorf("failed to extract VC tokens: %w", err)
 	}
 
 	return &VPVerifyResult{
-		HolderDID:      holderDID,
-		EmbeddedVCData: embeddedVCResults,
+		HolderDID: holderDID,
+		VC:        vcTokens,
 	}, nil
 }
 
@@ -172,10 +145,6 @@ func buildVPOptions(opts *vpVerifyOptions) []vp.PresentationOpt {
 		vpOpts = append(vpOpts, vp.WithCheckExpiration())
 	}
 
-	if opts.isValidateVC {
-		vpOpts = append(vpOpts, vp.WithVCValidation())
-	}
-
 	return vpOpts
 }
 
@@ -194,11 +163,9 @@ func extractHolderDIDFromData(vpData map[string]interface{}) (string, error) {
 	return holderDID, nil
 }
 
-// verifyEmbeddedVCs extracts and verifies all embedded VCs in the presentation.
-// Returns VerifyResult objects for each embedded VC, allowing callers to apply
-// custom aggregation and conflict resolution logic based on business requirements.
-// Note: VCs are already validated by ParsePresentation if WithVPValidateCredentials was enabled.
-func verifyEmbeddedVCs(ctx context.Context, vpData map[string]interface{}, resolver verificationmethod.ResolverProvider, didBaseURL, verificationMethodKey string) ([]*VerifyResult, error) {
+// extractVCTokens extracts all embedded VC tokens from the VP data.
+// Each VC is returned as an AuthResponse containing the raw JWT token.
+func extractVCTokens(vpData map[string]interface{}) ([]*AuthResponse, error) {
 	vcListRaw, ok := vpData["verifiableCredential"]
 	if !ok || vcListRaw == nil {
 		return nil, fmt.Errorf("no embedded credentials found in presentation")
@@ -213,40 +180,14 @@ func verifyEmbeddedVCs(ctx context.Context, vpData map[string]interface{}, resol
 		return nil, fmt.Errorf("verifiableCredential array is empty")
 	}
 
-	// Extract VC tokens and verify each for permissions extraction
-	results := make([]*VerifyResult, 0, len(vcList))
+	tokens := make([]*AuthResponse, 0, len(vcList))
 	for i, vcItem := range vcList {
-		var vcBytes []byte
-		switch v := vcItem.(type) {
-		case string:
-			vcBytes = []byte(v)
-		default:
-			var marshalErr error
-			vcBytes, marshalErr = json.Marshal(v)
-			if marshalErr != nil {
-				return nil, fmt.Errorf("failed to marshal embedded vc at index %d: %w", i, marshalErr)
-			}
+		token, ok := vcItem.(string)
+		if !ok {
+			return nil, fmt.Errorf("verifiableCredential at index %d must be a string token", i)
 		}
-
-		// Verify the VC using auth.Verify to extract permissions and claims.
-		// Note: If WithVPValidateCredentials was enabled, VCs are already validated by ParsePresentation.
-		verifyOpts := []VerifyOpt{
-			WithVerifyProof(),
-			WithCheckExpiration(),
-			WithVerifyPermissions(),
-		}
-		if resolver != nil {
-			verifyOpts = append(verifyOpts, WithResolver(resolver))
-		} else {
-			verifyOpts = append(verifyOpts, WithDIDBaseURL(didBaseURL), WithVerificationMethodKey(verificationMethodKey))
-		}
-		result, err := Verify(ctx, vcBytes, verifyOpts...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to verify embedded vc at index %d: %w", i, err)
-		}
-
-		results = append(results, result)
+		tokens = append(tokens, &AuthResponse{Token: token})
 	}
 
-	return results, nil
+	return tokens, nil
 }

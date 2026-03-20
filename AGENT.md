@@ -149,7 +149,6 @@ vpResult, err := auth.VerifyPresentation(
     []byte(vpToken),
     auth.WithVPVerifyProof(),
     auth.WithVPCheckExpiration(),
-    auth.WithVPValidateCredentials(),
     auth.WithVPDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
 )
 if err != nil {
@@ -159,11 +158,17 @@ if err != nil {
 // Access holder DID
 holderDID := vpResult.HolderDID
 
-// Process each embedded VC's verification result independently
-// Implement custom aggregation/conflict resolution based on business logic
-for i, vcResult := range vpResult.EmbeddedVCData {
-    issuerDID := vcResult.IssuerDID
-    permissions := vcResult.Permissions
+// Each embedded VC is returned as a raw token. Verify each VC independently.
+for i, vc := range vpResult.VC {
+    vcResult, err := auth.Verify(ctx, []byte(vc.Token),
+        auth.WithVerifyProof(),
+        auth.WithCheckExpiration(),
+        auth.WithVerifyPermissions(),
+        auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+    )
+    if err != nil {
+        // Handle error per VC
+    }
     // Apply business-specific logic for combining permissions
 }
 ```
@@ -341,9 +346,10 @@ result, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithSigner
 |--------|---------|
 | `WithVPVerifyProof()` | Verify VP cryptographic signature/proof |
 | `WithVPCheckExpiration()` | Check VP validity period |
-| `WithVPValidateCredentials()` | Enable embedded VC validation in parser |
-| `WithVPDIDBaseURL(url)` | DID resolution endpoint for VP proof/VC verification |
+| `WithVPDIDBaseURL(url)` | DID resolution endpoint for VP proof verification |
 | `WithVPVerificationMethodKey(key)` | Verification method key (default: `key-1`) |
+
+**Note:** `VerifyPresentation` parses the VP and extracts holder DID + raw VC tokens. It does NOT auto-verify embedded VCs. Callers should call `auth.Verify` for each VC token based on their business logic.
 
 ## Testing Notes
 

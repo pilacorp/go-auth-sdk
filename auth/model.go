@@ -77,10 +77,10 @@ type VPResponse struct {
 	Token string `json:"token"`
 }
 
-// VPVerifyResult represents the normalized result of presentation verification.
-// It contains the extracted holder DID and VerifyResult objects for each embedded VC.
-// This structure allows callers to implement custom aggregation and conflict resolution logic.
+// VPVerifyResult represents the result of presentation parsing.
+// It contains the extracted holder DID and raw VC tokens for each embedded VC.
+// Callers should parse and verify each VC token based on their own business logic.
 type VPVerifyResult struct {
-	HolderDID      string          // The holder DID from the presentation
-	EmbeddedVCData []*VerifyResult // Results from verifying each embedded VC
+	HolderDID string   // The holder DID from the presentation
+	VC        []*AuthResponse // Raw VC tokens extracted from the presentation
 }

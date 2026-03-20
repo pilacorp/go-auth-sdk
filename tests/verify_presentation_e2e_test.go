@@ -134,12 +134,23 @@ func TestVerifyPresentationFlow(t *testing.T) {
 		t.Fatalf("holder DID mismatch: got %q want %q", result.HolderDID, holderDID)
 	}
 
-	if len(result.EmbeddedVCData) != 2 {
-		t.Fatalf("embedded VC count mismatch: got %d want 2", len(result.EmbeddedVCData))
+	if len(result.VC) != 2 {
+		t.Fatalf("embedded VC count mismatch: got %d want 2", len(result.VC))
 	}
 
+	// Verify each VC token separately (callers should verify each VC based on their business logic)
 	actions := map[string]bool{}
-	for _, vcResult := range result.EmbeddedVCData {
+	for i, vc := range result.VC {
+		vcResult, err := auth.Verify(ctx, []byte(vc.Token),
+			auth.WithVerifyProof(),
+			auth.WithCheckExpiration(),
+			auth.WithVerifyPermissions(),
+			auth.WithDIDBaseURL(didBaseURL),
+			auth.WithVerificationMethodKey("key-1"),
+		)
+		if err != nil {
+			t.Fatalf("verify embedded vc[%d]: %v", i, err)
+		}
 		for _, stmt := range vcResult.Permissions {
 			for _, a := range stmt.Actions {
 				actions[a.String()] = true
