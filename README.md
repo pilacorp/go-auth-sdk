@@ -11,6 +11,7 @@ Go **Auth SDK** standardizes **Authentication + Authorization** using **Verifiab
 
 - **Policy-based permissions**: fine-grained authorization by action/resource/condition, moving away from "all-or-nothing" access.
 - **End-to-end VC-JWT flow**: build credential, sign, verify, extract permissions.
+- **End-to-end VP-JWT flow**: build presentation from one or many VC tokens, verify presentation, and parse/verify embedded VCs independently.
 - **Pluggable signer**: sign with local private key or Vault signer.
 - **Status integration (revocation)**: supports `credentialStatus` for credential revocation checking.
 
@@ -35,6 +36,8 @@ go get github.com/pilacorp/go-auth-sdk
 - **Service**: uses `auth.Verify` to:
   - verify signature, expiration, schema, revocation (via options)
   - extract normalized issuer DID, holder DID, and permissions.
+- **Holder (presentation)**: uses `auth.NewVPBuilder(...).Build(...)` to create a VP-JWT from one or many VC-JWTs.
+- **Service (presentation)**: uses `auth.VerifyPresentation` to verify VP, then parses and verifies each embedded VC independently based on business logic.
 
 #### 2. Input Structure for Building: `AuthData`
 
@@ -304,9 +307,69 @@ fmt.Println("Holder DID:", result.HolderDID)
 fmt.Printf("Permissions: %+v\n", result.Permissions)
 ```
 
+#### 6. Build and Verify Presentation (VP-JWT)
+
+Use VP flow when a holder needs to present one or many VC-JWTs in a single signed presentation.
+
+**Build VP:**
+
+```go
+vpSigner := ecdsa.NewPrivSigner(nil)
+vpBuilder := auth.NewVPBuilder(
+	auth.WithVPSigner(vpSigner),
+)
+
+vpResp, err := vpBuilder.Build(ctx, auth.VPData{
+	HolderDID: "did:nda:testnet:0xHOLDER",
+	VCTokens:  []string{vcToken1, vcToken2},
+}, auth.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)))
+if err != nil {
+	log.Fatalf("build presentation error: %v", err)
+}
+
+fmt.Println("VP-JWT:", vpResp.Token)
+```
+
+**Verify VP:**
+
+```go
+vpResult, err := auth.VerifyPresentation(
+	ctx,
+	[]byte(vpResp.Token),
+	auth.WithVPVerifyProof(),
+	auth.WithVPCheckExpiration(),
+	auth.WithVPDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+	auth.WithVPVerificationMethodKey("key-1"),
+)
+if err != nil {
+	log.Fatalf("verify presentation error: %v", err)
+}
+
+fmt.Println("Holder DID:", vpResult.HolderDID)
+
+// Each embedded VC is returned as a raw token. Verify each VC independently
+// based on your business logic (e.g., different schema, policy requirements).
+for i, vc := range vpResult.VC {
+	vcResult, err := auth.Verify(ctx, []byte(vc.Token),
+		auth.WithVerifyProof(),
+		auth.WithCheckExpiration(),
+		auth.WithVerifyPermissions(),
+		auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+		auth.WithVerificationMethodKey("key-1"),
+	)
+	if err != nil {
+		log.Fatalf("verify embedded vc[%d] error: %v", i, err)
+	}
+	fmt.Printf("VC[%d] from %s:\n", i, vcResult.IssuerDID)
+	fmt.Printf("  Permissions: %+v\n", vcResult.Permissions)
+}
+```
+
 ### Repo Structure
 
 - `auth/`: Main API for building/verifying VC-JWT.
+- `auth/vp_builder.go`: VP builder for creating VP-JWT from VC tokens.
+- `auth/vp_verifier.go`: VP verifier for VP proof/claims checks and embedded VC verification.
 - `auth/policy/`: Policy/permission data types and validation functions.
 - `signer/`: `Signer` interface + implementations: ECDSA signer, Vault signer.
 - `examples/`: SDK usage examples.

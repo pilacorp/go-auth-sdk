@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Released]
 
+### Added
+- Verifiable Presentation (VP) build flow via `VPBuilder` (`NewVPBuilder`, `WithVPSigner`, `WithVPSignerOptions`, `Build`)
+- Verifiable Presentation verification via `VerifyPresentation` with optional checks for VP proof and expiration. Returns holder DID and raw VC tokens — callers should verify each VC independently.
+
+### Updated
+- Documentation updates for VP usage in `README.md`, `AGENT.md`, and examples guide
+
 ## [v1.0.6]
 
 ### Fixed
