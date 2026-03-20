@@ -356,10 +356,6 @@ for i, vcResult := range vpResult.EmbeddedVCData {
 }
 ```
 
-Optional anti-replay checks:
-- `auth.WithVPVerifyAudience("expected-audience")`
-- `auth.WithVPVerifyNonce("expected-nonce")`
-
 ### Repo Structure
 
 - `auth/`: Main API for building/verifying VC-JWT.

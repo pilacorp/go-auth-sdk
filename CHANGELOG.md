@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Verifiable Presentation (VP) build flow via `VPBuilder` (`NewVPBuilder`, `WithVPSigner`, `WithVPSignerOptions`, `Build`)
-- Verifiable Presentation verification flow via `VerifyPresentation` with optional checks for proof, expiration, embedded credential validation, audience, and nonce
+- Verifiable Presentation verification flow via `VerifyPresentation` with optional checks for proof, expiration, embedded credential validation
 
 ### Updated
 - Documentation updates for VP usage in `README.md`, `AGENT.md`, and examples guide
