@@ -795,3 +795,85 @@ func TestBuildVPOptions_Partial(t *testing.T) {
 		t.Fatalf("buildVPOptions should produce 1 option when only didBaseURL is set, got %d", len(vpOpts))
 	}
 }
+
+type mockVPResolver struct {
+	publicKey string
+}
+
+func (m *mockVPResolver) GetPublicKey(_ string) (string, error) {
+	return m.publicKey, nil
+}
+
+func TestVerifyPresentation_WithResolver(t *testing.T) {
+	ctx := context.Background()
+
+	issuerPriv, _ := crypto.GenerateKey()
+	issuerKeyBytes := crypto.FromECDSA(issuerPriv)
+
+	holderPriv, _ := crypto.GenerateKey()
+	holderKeyBytes := crypto.FromECDSA(holderPriv)
+
+	issuerDID := "did:test:issuer"
+	holderDID := "did:test:holder"
+
+	// Create test DID server
+	didServer := newTestDIDServer(t, issuerDID, issuerKeyBytes, holderDID, holderKeyBytes)
+	defer didServer.Close()
+
+	didBaseURL := didServer.URL + "/api/v1/did"
+	vc.Init(didBaseURL)
+	vp.Init(didBaseURL)
+
+	vcToken := createTestVCToken(t, issuerDID, holderDID, issuerKeyBytes)
+
+	ecdsaSigner := ecdsasigner.NewPrivSigner(nil)
+	vpBuilder := NewVPBuilder(WithVPSigner(ecdsaSigner))
+
+	vpResp, err := vpBuilder.Build(ctx, VPData{
+		ID:        "urn:uuid:test-vp-resolver",
+		HolderDID: holderDID,
+		VCTokens:  []string{vcToken},
+	}, WithVPSignerOptions(signer.WithPrivateKey(holderKeyBytes)))
+	if err != nil {
+		t.Fatalf("build vp failed: %v", err)
+	}
+
+	// Create resolver that returns the issuer's actual public key (used for VC proof verification)
+	issuerPK, _ := crypto.ToECDSA(issuerKeyBytes)
+	issuerPubKeyBytes := crypto.FromECDSAPub(&issuerPK.PublicKey)
+	issuerPubKey := "0x" + hex.EncodeToString(issuerPubKeyBytes)
+	issuerResolver := &mockVPResolver{publicKey: issuerPubKey}
+
+	// Verify with resolver - should bypass DID URL resolution for embedded VCs
+	result, err := VerifyPresentation(ctx, []byte(vpResp.Token),
+		WithVPVerifyProof(),
+		WithVPDIDBaseURL(didBaseURL),
+		WithVPVerificationMethodKey("key-1"),
+		WithVPResolver(issuerResolver),
+	)
+	if err != nil {
+		t.Fatalf("VerifyPresentation() with resolver error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatalf("VerifyPresentation() returned nil result")
+	}
+
+	if result.HolderDID != holderDID {
+		t.Fatalf("HolderDID mismatch: got %q, want %q", result.HolderDID, holderDID)
+	}
+
+	if len(result.EmbeddedVCData) == 0 {
+		t.Fatalf("expected non-empty embedded VC data")
+	}
+}
+
+func TestGetVPVerifyOptions_WithResolver(t *testing.T) {
+	opts := getVPVerifyOptions(
+		WithVPResolver(&mockVPResolver{publicKey: "0x0400000000"}),
+	)
+
+	if opts.resolver == nil {
+		t.Fatal("resolver should be set when WithVPResolver is used")
+	}
+}

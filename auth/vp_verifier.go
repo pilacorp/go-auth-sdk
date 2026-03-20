@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
 )
 
@@ -19,6 +20,7 @@ type vpVerifyOptions struct {
 	isVerifyProof         bool
 	isCheckExpiration     bool
 	isValidateVC          bool
+	resolver              verificationmethod.ResolverProvider
 }
 
 // WithVPDIDBaseURL sets the DID base URL for presentation verification.
@@ -62,6 +64,16 @@ func WithVPCheckExpiration() VPVerifyOpt {
 func WithVPValidateCredentials() VPVerifyOpt {
 	return func(o *vpVerifyOptions) {
 		o.isValidateVC = true
+	}
+}
+
+// WithVPResolver sets the resolver provider used for proof verification of embedded VCs.
+// You can create StaticResolver (pass public key directly) or Resolver (resolve via DID URL)
+// that implements verificationmethod.ResolverProvider interface.
+// This bypasses DID URL resolution and improves performance by using a pre-configured public key.
+func WithVPResolver(resolver verificationmethod.ResolverProvider) VPVerifyOpt {
+	return func(o *vpVerifyOptions) {
+		o.resolver = resolver
 	}
 }
 
@@ -113,7 +125,7 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 	}
 
 	// Extract and verify all embedded VCs
-	embeddedVCResults, err := verifyEmbeddedVCs(ctx, vpData, verifyOpts)
+	embeddedVCResults, err := verifyEmbeddedVCs(ctx, vpData, verifyOpts.resolver, verifyOpts.didBaseURL, verifyOpts.verificationMethodKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify embedded credentials: %w", err)
 	}
@@ -186,7 +198,7 @@ func extractHolderDIDFromData(vpData map[string]interface{}) (string, error) {
 // Returns VerifyResult objects for each embedded VC, allowing callers to apply
 // custom aggregation and conflict resolution logic based on business requirements.
 // Note: VCs are already validated by ParsePresentation if WithVPValidateCredentials was enabled.
-func verifyEmbeddedVCs(ctx context.Context, vpData map[string]interface{}, verifyOpts *vpVerifyOptions) ([]*VerifyResult, error) {
+func verifyEmbeddedVCs(ctx context.Context, vpData map[string]interface{}, resolver verificationmethod.ResolverProvider, didBaseURL, verificationMethodKey string) ([]*VerifyResult, error) {
 	vcListRaw, ok := vpData["verifiableCredential"]
 	if !ok || vcListRaw == nil {
 		return nil, fmt.Errorf("no embedded credentials found in presentation")
@@ -218,13 +230,17 @@ func verifyEmbeddedVCs(ctx context.Context, vpData map[string]interface{}, verif
 
 		// Verify the VC using auth.Verify to extract permissions and claims.
 		// Note: If WithVPValidateCredentials was enabled, VCs are already validated by ParsePresentation.
-		result, err := Verify(ctx, vcBytes,
+		verifyOpts := []VerifyOpt{
 			WithVerifyProof(),
 			WithCheckExpiration(),
 			WithVerifyPermissions(),
-			WithDIDBaseURL(verifyOpts.didBaseURL),
-			WithVerificationMethodKey(verifyOpts.verificationMethodKey),
-		)
+		}
+		if resolver != nil {
+			verifyOpts = append(verifyOpts, WithResolver(resolver))
+		} else {
+			verifyOpts = append(verifyOpts, WithDIDBaseURL(didBaseURL), WithVerificationMethodKey(verificationMethodKey))
+		}
+		result, err := Verify(ctx, vcBytes, verifyOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to verify embedded vc at index %d: %w", i, err)
 		}
