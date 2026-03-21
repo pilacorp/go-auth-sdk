@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pilacorp/go-auth-sdk/auth"
+	"github.com/pilacorp/go-auth-sdk/auth/builder"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	"github.com/pilacorp/go-auth-sdk/auth/verifier"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
@@ -81,50 +83,50 @@ func TestVerifyPresentationFlow(t *testing.T) {
 	}
 
 	issuerSigner := ecdsa.NewPrivSigner(nil)
-	vcBuilder := auth.NewAuthBuilder(
-		auth.WithBuilderSchemaID("https://example.com/schema/v1"),
-		auth.WithSigner(issuerSigner),
+	vcBuilder := builder.NewAuthBuilder(
+		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
+		builder.WithSigner(issuerSigner),
 	)
 
-	vcA, err := vcBuilder.Build(ctx, auth.AuthData{
+	vcA, err := vcBuilder.Build(ctx, model.AuthData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           policy1,
 		CredentialStatus: credentialStatus,
-	}, auth.WithSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
+	}, builder.WithSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
 	if err != nil {
 		t.Fatalf("build vcA: %v", err)
 	}
 
-	vcB, err := vcBuilder.Build(ctx, auth.AuthData{
+	vcB, err := vcBuilder.Build(ctx, model.AuthData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           policy2,
 		CredentialStatus: credentialStatus,
-	}, auth.WithSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
+	}, builder.WithSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
 	if err != nil {
 		t.Fatalf("build vcB: %v", err)
 	}
 
 	holderSigner := ecdsa.NewPrivSigner(nil)
-	vpBuilder := auth.NewVPBuilder(auth.WithVPSigner(holderSigner))
+	vpBuilder := builder.NewVPBuilder(builder.WithVPSigner(holderSigner))
 
-	vpResp, err := vpBuilder.Build(ctx, auth.VPData{
+	vpResp, err := vpBuilder.Build(ctx, model.VPData{
 		ID:         "urn:uuid:test-vp",
 		HolderDID:  holderDID,
 		VCTokens:   []string{vcA.Token, vcB.Token},
 		ValidFrom:  ptrTime(time.Now()),
 		ValidUntil: ptrTime(time.Now().Add(5 * time.Minute)),
-	}, auth.WithVPSignerOptions(signer.WithPrivateKey(holderKeyBytes)))
+	}, builder.WithVPSignerOptions(signer.WithPrivateKey(holderKeyBytes)))
 	if err != nil {
 		t.Fatalf("build vp: %v", err)
 	}
 
-	result, err := auth.VerifyPresentation(ctx, []byte(vpResp.Token),
-		auth.WithVPVerifyProof(),
-		auth.WithVPCheckExpiration(),
-		auth.WithVPDIDBaseURL(didBaseURL),
-		auth.WithVPVerificationMethodKey("key-1"),
+	result, err := verifier.VerifyPresentation(ctx, []byte(vpResp.Token),
+		verifier.WithVPVerifyProof(),
+		verifier.WithVPCheckExpiration(),
+		verifier.WithVPDIDBaseURL(didBaseURL),
+		verifier.WithVPVerificationMethodKey("key-1"),
 	)
 	if err != nil {
 		t.Fatalf("verify presentation: %v", err)
@@ -134,19 +136,19 @@ func TestVerifyPresentationFlow(t *testing.T) {
 		t.Fatalf("holder DID mismatch: got %q want %q", result.HolderDID, holderDID)
 	}
 
-	if len(result.VC) != 2 {
-		t.Fatalf("embedded VC count mismatch: got %d want 2", len(result.VC))
+	if len(result.VCs) != 2 {
+		t.Fatalf("embedded VC count mismatch: got %d want 2", len(result.VCs))
 	}
 
 	// Verify each VC token separately (callers should verify each VC based on their business logic)
 	actions := map[string]bool{}
-	for i, vc := range result.VC {
-		vcResult, err := auth.Verify(ctx, []byte(vc.Token),
-			auth.WithVerifyProof(),
-			auth.WithCheckExpiration(),
-			auth.WithVerifyPermissions(),
-			auth.WithDIDBaseURL(didBaseURL),
-			auth.WithVerificationMethodKey("key-1"),
+	for i, vc := range result.VCs {
+		vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+			verifier.WithVerifyProof(),
+			verifier.WithCheckExpiration(),
+			verifier.WithVerifyPermissions(),
+			verifier.WithDIDBaseURL(didBaseURL),
+			verifier.WithVerificationMethodKey("key-1"),
 		)
 		if err != nil {
 			t.Fatalf("verify embedded vc[%d]: %v", i, err)

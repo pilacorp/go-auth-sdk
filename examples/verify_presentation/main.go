@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pilacorp/go-auth-sdk/auth"
+	"github.com/pilacorp/go-auth-sdk/auth/builder"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	"github.com/pilacorp/go-auth-sdk/auth/verifier"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
@@ -119,18 +121,18 @@ func main() {
 	}
 
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
-	builder := auth.NewAuthBuilder(
-		auth.WithBuilderSchemaID(schemaID),
-		auth.WithSigner(ecdsaSigner),
+	authBuilder := builder.NewAuthBuilder(
+		builder.WithBuilderSchemaID(schemaID),
+		builder.WithSigner(ecdsaSigner),
 	)
 
 	for i, p := range []*policy.Policy{&policy1, &policy2, &policy3} {
-		resp, err := builder.Build(ctx, auth.AuthData{
+		resp, err := authBuilder.Build(ctx, model.AuthData{
 			IssuerDID:        issuerDID,
 			HolderDID:        holderDID,
 			Policy:           *p,
 			CredentialStatus: credentialStatus,
-		}, auth.WithSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
+		}, builder.WithSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
 		if err != nil {
 			log.Fatalf("build vc[%d] failed: %v", i, err)
 		}
@@ -138,53 +140,21 @@ func main() {
 		fmt.Printf("✓ Issued VC[%d]\n", i)
 	}
 
-	// Step 5: Create VP from VCs
+	// Step 5: Create VP from VC tokens
 	fmt.Println("\n--- Creating Verifiable Presentation ---")
 
-	vcs := make([]vc.Credential, 0, len(vcTokens))
-	for i, token := range vcTokens {
-		credential, err := vc.ParseCredential([]byte(token))
-		if err != nil {
-			log.Fatalf("parse vc[%d] failed: %v", i, err)
-		}
-		vcs = append(vcs, credential)
-	}
-
-	contents := vp.PresentationContents{
-		Context:               []any{"https://www.w3.org/ns/credentials/v2"},
-		ID:                    "urn:uuid:full-flow-vp",
-		Types:                 []string{"VerifiablePresentation"},
-		Holder:                holderDID,
-		ValidFrom:             time.Now(),
-		ValidUntil:            time.Now().Add(5 * time.Minute),
-		VerifiableCredentials: vcs,
-	}
-
-	presentation, err := vp.NewJWTPresentation(contents)
+	vpBuilder := builder.NewVPBuilder(builder.WithVPSigner(ecdsa.NewPrivSigner(nil)))
+	vpResp, err := vpBuilder.Build(ctx, model.VPData{
+		ID:         "urn:uuid:full-flow-vp",
+		HolderDID:  holderDID,
+		VCTokens:   vcTokens,
+		ValidFrom:  ptrTime(time.Now()),
+		ValidUntil: ptrTime(time.Now().Add(5 * time.Minute)),
+	}, builder.WithVPSignerOptions(signer.WithPrivateKey(holderKeyBytes)))
 	if err != nil {
-		log.Fatalf("new jwt presentation failed: %v", err)
+		log.Fatalf("build vp failed: %v", err)
 	}
-	fmt.Println("✓ Created JWT Presentation structure")
-
-	// Step 6: Sign VP with holder key
-	fmt.Println("\n--- Signing VP with holder key ---")
-
-	holderKeyHex := fmt.Sprintf("%x", holderKeyBytes)
-	if err := presentation.AddProof(holderKeyHex); err != nil {
-		log.Fatalf("holder add vp proof failed: %v", err)
-	}
-	fmt.Println("✓ Added holder proof to VP")
-
-	serialized, err := presentation.Serialize()
-	if err != nil {
-		log.Fatalf("serialize vp failed: %v", err)
-	}
-
-	vpToken, ok := serialized.(string)
-	if !ok {
-		log.Fatalf("invalid vp token type: expected string")
-	}
-	fmt.Printf("✓ Signed and serialized VP token\n")
+	fmt.Println("✓ Built and signed VP token")
 
 	// Step 7: Sleep 5 seconds
 	fmt.Println("\n--- Sleeping 5 seconds ---")
@@ -194,11 +164,11 @@ func main() {
 	// Step 8: Verify VP and extract results
 	fmt.Println("\n--- Verifying Presentation ---")
 
-	vpResult, err := auth.VerifyPresentation(ctx, []byte(vpToken),
-		auth.WithVPVerifyProof(),
-		auth.WithVPCheckExpiration(),
-		auth.WithVPDIDBaseURL(didBaseURL),
-		auth.WithVPVerificationMethodKey("key-1"),
+	vpResult, err := verifier.VerifyPresentation(ctx, []byte(vpResp.Token),
+		verifier.WithVPVerifyProof(),
+		verifier.WithVPCheckExpiration(),
+		verifier.WithVPDIDBaseURL(didBaseURL),
+		verifier.WithVPVerificationMethodKey("key-1"),
 	)
 	if err != nil {
 		log.Fatalf("verify presentation failed: %v", err)
@@ -210,10 +180,10 @@ func main() {
 	// Step 9: Display VP Response
 	fmt.Println("\n=== Verification Complete ===")
 	fmt.Printf("Holder DID: %s\n", vpResult.HolderDID)
-	fmt.Printf("Total Embedded VCs: %d\n", len(vpResult.VC))
+	fmt.Printf("Total Embedded VCs: %d\n", len(vpResult.VCs))
 
 	fmt.Println("\nEmbedded VC Tokens (callers should parse/verify each VC based on their business logic):")
-	for i, vc := range vpResult.VC {
+	for i, vc := range vpResult.VCs {
 		// Truncate long tokens for display
 		tokenDisplay := vc.Token
 		if len(tokenDisplay) > 50 {
@@ -224,7 +194,7 @@ func main() {
 
 	// Step 10: Parse and verify each embedded VC token
 	fmt.Println("\n--- Parsing and Verifying Embedded VCs ---")
-	for i, vcResp := range vpResult.VC {
+	for i, vcResp := range vpResult.VCs {
 		token := vcResp.Token
 
 		if _, err := vc.ParseCredential([]byte(token)); err != nil {
@@ -232,14 +202,14 @@ func main() {
 		}
 		fmt.Printf("✓ Parsed embedded VC[%d]\n", i)
 
-		vcVerifyResult, err := auth.Verify(
+		vcVerifyResult, err := verifier.Verify(
 			ctx,
 			[]byte(token),
-			auth.WithVerifyProof(),
-			auth.WithCheckExpiration(),
-			auth.WithDIDBaseURL(didBaseURL),
-			auth.WithVerificationMethodKey("key-1"),
-			auth.WithVerifyPermissions(),
+			verifier.WithVerifyProof(),
+			verifier.WithCheckExpiration(),
+			verifier.WithDIDBaseURL(didBaseURL),
+			verifier.WithVerificationMethodKey("key-1"),
+			verifier.WithVerifyPermissions(),
 		)
 		if err != nil {
 			log.Fatalf("verify embedded vc[%d] failed: %v", i, err)
@@ -272,6 +242,10 @@ func publicKeyHexFromPrivateKey(privateKeyBytes []byte) (string, error) {
 
 	pubBytes := crypto.FromECDSAPub(&pk.PublicKey)
 	return hex.EncodeToString(pubBytes), nil
+}
+
+func ptrTime(t time.Time) *time.Time {
+	return &t
 }
 
 func startLocalDIDResolver(issuerDID, issuerPubHex, holderDID, holderPubHex string) *httptest.Server {
