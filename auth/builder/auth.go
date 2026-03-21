@@ -2,14 +2,12 @@ package builder
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
-	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -125,39 +123,9 @@ func (b *AuthBuilder) Build(ctx context.Context, data model.AuthData, opts ...Au
 		return nil, fmt.Errorf("failed to create JWT credential: %w", err)
 	}
 
-	// Sign the credential
-	// Get signing input
-	signData, err := vcCredential.GetSigningInput()
+	token, err := signAndSerializeJWT(ctx, jwtCredential{vcCredential}, options.signer, options.signerOptions, "credential")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get signing input: %w", err)
-	}
-
-	// Hash the signing data
-	hash := sha256.Sum256(signData)
-
-	// Sign the credential
-	signature, err := options.signer.Sign(ctx, hash[:], options.signerOptions...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign credential: %w", err)
-	}
-
-	// Add proof with signature
-	err = vcCredential.AddCustomProof(&vcdto.Proof{
-		Signature: signature,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to add proof: %w", err)
-	}
-
-	// Serialize the credential to JWT string
-	tokenStr, err := vcCredential.Serialize()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize credential: %w", err)
-	}
-
-	token, ok := tokenStr.(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid token type: expected string")
+		return nil, err
 	}
 
 	return &model.AuthResponse{

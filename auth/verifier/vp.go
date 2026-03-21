@@ -20,6 +20,12 @@ type vpVerifyOptions struct {
 	isCheckExpiration     bool
 }
 
+// presentationData represents the VP fields needed by the verifier.
+type presentationData struct {
+	Holder               string   `json:"holder"`
+	VerifiableCredential []string `json:"verifiableCredential"`
+}
+
 // WithVPDIDBaseURL sets the DID base URL for presentation verification.
 // This URL is used to resolve DID documents for proof verification.
 // If not set, defaults to "https://api.ndadid.vn/api/v1/did".
@@ -86,7 +92,7 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 		return nil, fmt.Errorf("failed to get presentation contents: %w", err)
 	}
 
-	var vpData map[string]interface{}
+	var vpData presentationData
 	if err := json.Unmarshal(vpContents, &vpData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal presentation: %w", err)
 	}
@@ -149,43 +155,27 @@ func buildVPOptions(opts *vpVerifyOptions) []vp.PresentationOpt {
 }
 
 // extractHolderDIDFromData extracts the holder DID from the unmarshaled VP data.
-func extractHolderDIDFromData(vpData map[string]interface{}) (string, error) {
-	holderRaw, ok := vpData["holder"]
-	if !ok {
-		return "", fmt.Errorf("holder field not found in presentation")
-	}
-
-	holderDID, ok := holderRaw.(string)
-	if !ok || holderDID == "" {
+func extractHolderDIDFromData(vpData presentationData) (string, error) {
+	if vpData.Holder == "" {
 		return "", fmt.Errorf("holder must be a non-empty string")
 	}
 
-	return holderDID, nil
+	return vpData.Holder, nil
 }
 
 // extractVCTokens extracts all embedded VC tokens from the VP data.
 // Each VC is returned as an AuthResponse containing the raw JWT token.
-func extractVCTokens(vpData map[string]interface{}) ([]*model.AuthResponse, error) {
-	vcListRaw, ok := vpData["verifiableCredential"]
-	if !ok || vcListRaw == nil {
+func extractVCTokens(vpData presentationData) ([]*model.AuthResponse, error) {
+	if vpData.VerifiableCredential == nil {
 		return nil, fmt.Errorf("no embedded credentials found in presentation")
 	}
 
-	vcList, ok := vcListRaw.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("verifiableCredential must be an array")
-	}
-
-	if len(vcList) == 0 {
+	if len(vpData.VerifiableCredential) == 0 {
 		return nil, fmt.Errorf("verifiableCredential array is empty")
 	}
 
-	tokens := make([]*model.AuthResponse, 0, len(vcList))
-	for i, vcItem := range vcList {
-		token, ok := vcItem.(string)
-		if !ok {
-			return nil, fmt.Errorf("verifiableCredential at index %d must be a string token", i)
-		}
+	tokens := make([]*model.AuthResponse, 0, len(vpData.VerifiableCredential))
+	for _, token := range vpData.VerifiableCredential {
 		tokens = append(tokens, &model.AuthResponse{Token: token})
 	}
 
