@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/pilacorp/go-auth-sdk/auth/model"
+	credentialjwt "github.com/pilacorp/go-credential-sdk/credential/common/jwt"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
 )
 
@@ -18,12 +21,30 @@ type vpVerifyOptions struct {
 	verificationMethodKey string
 	isVerifyProof         bool
 	isCheckExpiration     bool
+	resolver              verificationmethod.ResolverProvider
 }
 
 // presentationData represents the VP fields needed by the verifier.
 type presentationData struct {
 	Holder               string   `json:"holder"`
 	VerifiableCredential []string `json:"verifiableCredential"`
+}
+
+func (o *vpVerifyOptions) validate() error {
+	if o.didBaseURL != "" {
+		parsedURL, err := url.Parse(o.didBaseURL)
+		if err != nil {
+			return fmt.Errorf("didBaseURL is not a valid URL: %w", err)
+		}
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			return fmt.Errorf("didBaseURL must have http or https scheme, got: %s", parsedURL.Scheme)
+		}
+		if parsedURL.Host == "" {
+			return fmt.Errorf("didBaseURL must have a host")
+		}
+	}
+
+	return nil
 }
 
 // WithVPDIDBaseURL sets the DID base URL for presentation verification.
@@ -62,6 +83,14 @@ func WithVPCheckExpiration() VPVerifyOpt {
 	}
 }
 
+// WithVPResolver sets the resolver provider used for VP proof verification.
+// This allows callers to verify proofs using a custom DID resolver or a static public key resolver.
+func WithVPResolver(resolver verificationmethod.ResolverProvider) VPVerifyOpt {
+	return func(o *vpVerifyOptions) {
+		o.resolver = resolver
+	}
+}
+
 // VerifyPresentation parses a Verifiable Presentation and extracts the holder DID
 // and raw VC tokens. It performs VP-level verification (proof and expiration)
 // if enabled via options.
@@ -75,7 +104,10 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 		return nil, fmt.Errorf("presentation is empty")
 	}
 
-	verifyOpts := getVPVerifyOptions(opts...)
+	verifyOpts, err := getVPVerifyOptions(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get VP verify options: %w", err)
+	}
 
 	// Build credential SDK options
 	vpOpts := buildVPOptions(verifyOpts)
@@ -84,6 +116,12 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 	parsedVP, err := vp.ParsePresentation(presentation, vpOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse presentation: %w", err)
+	}
+
+	if verifyOpts.isVerifyProof && verifyOpts.resolver != nil {
+		if err := verifyVPProofWithResolver(presentation, verifyOpts.resolver); err != nil {
+			return nil, err
+		}
 	}
 
 	// Get presentation contents once and reuse across all checks
@@ -116,7 +154,7 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 }
 
 // getVPVerifyOptions applies all VP verification options and returns the result.
-func getVPVerifyOptions(opts ...VPVerifyOpt) *vpVerifyOptions {
+func getVPVerifyOptions(opts ...VPVerifyOpt) (*vpVerifyOptions, error) {
 	options := &vpVerifyOptions{
 		didBaseURL:            "https://api.ndadid.vn/api/v1/did",
 		verificationMethodKey: "key-1",
@@ -128,7 +166,11 @@ func getVPVerifyOptions(opts ...VPVerifyOpt) *vpVerifyOptions {
 		}
 	}
 
-	return options
+	if err := options.validate(); err != nil {
+		return nil, err
+	}
+
+	return options, nil
 }
 
 // buildVPOptions converts auth SDK VP verification options to credential SDK options.
@@ -143,7 +185,7 @@ func buildVPOptions(opts *vpVerifyOptions) []vp.PresentationOpt {
 		vpOpts = append(vpOpts, vp.WithVerificationMethodKey(opts.verificationMethodKey))
 	}
 
-	if opts.isVerifyProof {
+	if opts.isVerifyProof && opts.resolver == nil {
 		vpOpts = append(vpOpts, vp.WithVerifyProof())
 	}
 
@@ -152,6 +194,15 @@ func buildVPOptions(opts *vpVerifyOptions) []vp.PresentationOpt {
 	}
 
 	return vpOpts
+}
+
+func verifyVPProofWithResolver(presentation []byte, resolver verificationmethod.ResolverProvider) error {
+	verifier := credentialjwt.NewJWTVerifierWithResolver(resolver)
+	if err := verifier.VerifyJWT(string(presentation)); err != nil {
+		return fmt.Errorf("failed to verify presentation: %w", err)
+	}
+
+	return nil
 }
 
 // extractHolderDIDFromData extracts the holder DID from the unmarshaled VP data.
