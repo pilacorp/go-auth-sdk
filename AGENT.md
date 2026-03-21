@@ -13,14 +13,17 @@ Go Auth SDK provides authentication and authorization using Verifiable Credentia
 
 ```
 go-auth-sdk/
-├── auth/                    # Main API for building/verifying VC-JWT
-│   ├── auth.go             # AuthBuilder - build credentials
-│   ├── verifier.go         # Verify - verify credentials
-│   ├── vp_builder.go       # VPBuilder - build presentations
-│   ├── vp_verifier.go      # VerifyPresentation - verify presentations
-│   ├── model.go            # Data types (AuthData, VerifyResult)
+├── auth/
+│   ├── builder/           # Current VC/VP builder package
+│   ├── verifier/          # Current VC/VP verifier package
+│   ├── model/             # Current shared data types
+│   ├── policy/            # Policy/permission types
 │   ├── status_builder.go  # StatusBuilder interface for revocation
-│   └── policy/            # Policy/permission types
+│   ├── auth.go            # Legacy compatibility API
+│   ├── verifier.go        # Legacy compatibility API
+│   ├── vp_builder.go      # Legacy compatibility API
+│   ├── vp_verifier.go     # Legacy compatibility API
+│   └── model.go           # Legacy compatibility types
 ├── signer/                 # Signer interface + implementations
 │   ├── signer.go          # Signer interface
 │   ├── ecdsa/             # ECDSA local signer
@@ -69,22 +72,22 @@ credentialStatus := []vc.Status{
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 // 4. Create builder with schema ID and signer
-builder := auth.NewAuthBuilder(
-    auth.WithBuilderSchemaID("https://example.com/schema/v1"),
-    auth.WithSigner(ecdsaSigner),
+builder := builder.NewAuthBuilder(
+    builder.WithBuilderSchemaID("https://example.com/schema/v1"),
+    builder.WithSigner(ecdsaSigner),
 )
 
 // 5. Build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, err := builder.Build(ctx, auth.AuthData{
+result, err := builder.Build(ctx, model.AuthData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
     ValidFrom:        &validFrom,
     ValidUntil:       &validUntil,
     CredentialStatus: credentialStatus,
-}, auth.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+}, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 
 // result.Token contains the VC-JWT
 ```
@@ -92,18 +95,18 @@ result, err := builder.Build(ctx, auth.AuthData{
 ### Pattern 2: Verify a Credential (Service)
 
 ```go
-import "github.com/pilacorp/go-auth-sdk/auth"
+import "github.com/pilacorp/go-auth-sdk/auth/verifier"
 
 // Verify with multiple options
-result, err := auth.Verify(
+result, err := verifier.Verify(
     ctx,
     []byte(credentialToken),
-    auth.WithVerifyProof(),                    // verify signature
-    auth.WithCheckExpiration(),                // check validity period
-    auth.WithSchemaValidation(),               // validate schema
-    auth.WithCheckRevocation(),               // check revocation
-    auth.WithVerifySchemaID("https://example.com/schema/v1"),
-    auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+    verifier.WithVerifyProof(),                // verify signature
+    verifier.WithCheckExpiration(),            // check validity period
+    verifier.WithSchemaValidation(),           // validate schema
+    verifier.WithCheckRevocation(),            // check revocation
+    verifier.WithVerifySchemaID("https://example.com/schema/v1"),
+    verifier.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
 )
 
 if err != nil {
@@ -124,14 +127,14 @@ import (
 )
 
 vpSigner := ecdsa.NewPrivSigner(nil)
-vpBuilder := auth.NewVPBuilder(
-    auth.WithVPSigner(vpSigner),
+vpBuilder := builder.NewVPBuilder(
+    builder.WithVPSigner(vpSigner),
 )
 
-vpResp, err := vpBuilder.Build(context.Background(), auth.VPData{
+vpResp, err := vpBuilder.Build(context.Background(), model.VPData{
     HolderDID: "did:example:holder",
     VCTokens:  []string{vcToken1, vcToken2},
-}, auth.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)))
+}, builder.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)))
 if err != nil {
     // Handle error
 }
@@ -142,14 +145,14 @@ if err != nil {
 ### Pattern 4: Verify a Presentation and Handle Embedded VCs (Service)
 
 ```go
-import "github.com/pilacorp/go-auth-sdk/auth"
+import "github.com/pilacorp/go-auth-sdk/auth/verifier"
 
-vpResult, err := auth.VerifyPresentation(
+vpResult, err := verifier.VerifyPresentation(
     ctx,
     []byte(vpToken),
-    auth.WithVPVerifyProof(),
-    auth.WithVPCheckExpiration(),
-    auth.WithVPDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+    verifier.WithVPVerifyProof(),
+    verifier.WithVPCheckExpiration(),
+    verifier.WithVPDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
 )
 if err != nil {
     // Handle error
@@ -159,12 +162,12 @@ if err != nil {
 holderDID := vpResult.HolderDID
 
 // Each embedded VC is returned as a raw token. Verify each VC independently.
-for i, vc := range vpResult.VC {
-    vcResult, err := auth.Verify(ctx, []byte(vc.Token),
-        auth.WithVerifyProof(),
-        auth.WithCheckExpiration(),
-        auth.WithVerifyPermissions(),
-        auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+for i, vc := range vpResult.VCs {
+    vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+        verifier.WithVerifyProof(),
+        verifier.WithCheckExpiration(),
+        verifier.WithVerifyPermissions(),
+        verifier.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
     )
     if err != nil {
         // Handle error per VC
@@ -226,17 +229,17 @@ import "github.com/pilacorp/go-auth-sdk/signer/vault"
 
 vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
 
-builder := auth.NewAuthBuilder(
-    auth.WithBuilderSchemaID("https://example.com/schema/v1"),
-    auth.WithSigner(vaultSigner),
+builder := builder.NewAuthBuilder(
+    builder.WithBuilderSchemaID("https://example.com/schema/v1"),
+    builder.WithSigner(vaultSigner),
 )
 
-result, err := builder.Build(ctx, auth.AuthData{
+result, err := builder.Build(ctx, model.AuthData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
     CredentialStatus: credentialStatus,
-}, auth.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
+}, builder.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
 ```
 
 ## Error Handling
@@ -316,14 +319,14 @@ result, err := builder.Build(ctx, data)
 
 // Method 2: Pass key via options
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
-result, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+result, err := builder.Build(ctx, data, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 ```
 
 ### Vault Signer
 
 ```go
 vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
-result, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
+result, err := builder.Build(ctx, data, builder.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
 ```
 
 ## Verify Options

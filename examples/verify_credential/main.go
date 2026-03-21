@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/verifier"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -30,6 +32,12 @@ func main() {
 
 	// Step 2: Create signer
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
+
+	issuerPubHex := hex.EncodeToString(crypto.FromECDSAPub(&privateKey.PublicKey))
+	staticResolver, err := verificationmethod.NewStaticResolver(issuerPubHex)
+	if err != nil {
+		log.Fatalf("Failed to create static resolver: %v", err)
+	}
 
 	// Step 3: Create policy
 	policy := policy.NewPolicy(
@@ -83,8 +91,7 @@ func main() {
 		[]byte(result.Token),
 		verifier.WithVerifyProof(),
 		verifier.WithCheckExpiration(),
-		verifier.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
-		verifier.WithVerificationMethodKey("key-1"),
+		verifier.WithResolver(staticResolver),
 		verifier.WithVerifyPermissions(),
 	)
 	if err != nil {
