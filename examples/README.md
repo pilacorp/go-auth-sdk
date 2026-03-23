@@ -128,6 +128,11 @@ if err != nil {
 
 ### Building and Verifying a Presentation
 
+> Note:
+> - `WithVPResolver(...)` is optional.
+> - Custom resolver-based VP proof verification is not supported yet in the current version.
+> - For now, use `WithVPVerifyProof()` with DID base URL options for VP proof verification.
+
 ```go
 // Build VP-JWT from one or many VC-JWT tokens
 vpBuilder := builder.NewVPBuilder(builder.WithVPSigner(ecdsa.NewPrivSigner(nil)))

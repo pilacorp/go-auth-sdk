@@ -42,25 +42,6 @@ type verifyOptions struct {
 	schemaID            string
 }
 
-// credentialSubject represents a credentialSubject object with id and optional permissions.
-type credentialSubject struct {
-	ID          string          `json:"id"`
-	Permissions json.RawMessage `json:"permissions,omitempty"`
-}
-
-// credentialSchema represents the structure of credential schema.
-type credentialSchema struct {
-	ID   string `json:"id"`
-	Type string `json:"type"`
-}
-
-// credentialData represents the structure of credential data (without proof).
-type credentialData struct {
-	Issuer            string            `json:"issuer"`
-	CredentialSchema  credentialSchema  `json:"credentialSchema"`
-	CredentialSubject credentialSubject `json:"credentialSubject"`
-}
-
 func (o *verifyOptions) validate() error {
 	// check if didBaseURL is a valid URL
 	if o.didBaseURL != "" {
@@ -269,7 +250,7 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*model.V
 // Returns an error if the credential data is malformed or required fields are missing.
 
 func extractCredentialData(credData []byte) (issuerDID, holderDID string, schemaID string, permissions []policy.Statement, err error) {
-	var cred credentialData
+	var cred model.CredentialData
 	if err = json.Unmarshal(credData, &cred); err != nil {
 		return "", "", "", nil, fmt.Errorf("failed to unmarshal credential: %w", err)
 	}

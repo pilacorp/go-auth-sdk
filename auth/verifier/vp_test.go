@@ -845,7 +845,7 @@ func TestBuildVPOptions_Partial(t *testing.T) {
 
 func TestExtractVCTokens(t *testing.T) {
 	// Test with string tokens
-	vpData := presentationData{
+	vpData := model.PresentationData{
 		Holder:               "did:test:holder",
 		VerifiableCredential: []string{"token1", "token2"},
 	}
@@ -865,7 +865,7 @@ func TestExtractVCTokens(t *testing.T) {
 }
 
 func TestExtractVCTokens_Empty(t *testing.T) {
-	vpData := presentationData{
+	vpData := model.PresentationData{
 		Holder: "did:test:holder",
 	}
 
@@ -878,8 +878,8 @@ func TestExtractVCTokens_Empty(t *testing.T) {
 func TestExtractVCTokens_ObjectVC(t *testing.T) {
 	vpJSON := []byte(`{"holder":"did:test:holder","verifiableCredential":[{"id":"urn:uuid:test-vc"}]}`)
 
-	var vpData presentationData
+	var vpData model.PresentationData
 	if err := json.Unmarshal(vpJSON, &vpData); err == nil {
-		t.Fatalf("json.Unmarshal() should return error for object VC when presentationData expects []string")
+		t.Fatalf("json.Unmarshal() should return error for object VC when PresentationData expects []string")
 	}
 }

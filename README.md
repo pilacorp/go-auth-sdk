@@ -350,6 +350,11 @@ fmt.Println("VP-JWT:", vpResp.Token)
 
 **Verify VP:**
 
+> Note:
+> - `WithVPResolver(...)` is optional.
+> - Custom resolver-based VP proof verification is not supported yet in the current version.
+> - For now, use `WithVPVerifyProof()` with DID base URL options for VP proof verification.
+
 ```go
 import "github.com/pilacorp/go-auth-sdk/auth/verifier"
 

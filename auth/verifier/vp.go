@@ -13,7 +13,6 @@ import (
 	"net/url"
 
 	"github.com/pilacorp/go-auth-sdk/auth/model"
-	credentialjwt "github.com/pilacorp/go-credential-sdk/credential/common/jwt"
 	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
 )
@@ -28,12 +27,6 @@ type vpVerifyOptions struct {
 	isVerifyProof         bool
 	isCheckExpiration     bool
 	resolver              verificationmethod.ResolverProvider
-}
-
-// presentationData represents the VP fields needed by the verifier.
-type presentationData struct {
-	Holder               string   `json:"holder"`
-	VerifiableCredential []string `json:"verifiableCredential"`
 }
 
 func (o *vpVerifyOptions) validate() error {
@@ -124,11 +117,13 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 		return nil, fmt.Errorf("failed to parse presentation: %w", err)
 	}
 
-	if verifyOpts.isVerifyProof && verifyOpts.resolver != nil {
-		if err := verifyVPProofWithResolver(presentation, verifyOpts.resolver); err != nil {
-			return nil, err
-		}
-	}
+	// This is an optional step to verify the VP proof using a custom resolver, which can be enabled via options.
+	// But currently unused before we have to move the verifyVPProofWithResolver function to the credential SDK and make it available as a presentation option.
+	// if verifyOpts.isVerifyProof && verifyOpts.resolver != nil {
+	// 	if err := verifyVPProofWithResolver(presentation, verifyOpts.resolver); err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	// Get presentation contents once and reuse across all checks
 	vpContents, err := parsedVP.GetContents()
@@ -136,7 +131,7 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 		return nil, fmt.Errorf("failed to get presentation contents: %w", err)
 	}
 
-	var vpData presentationData
+	var vpData model.PresentationData
 	if err := json.Unmarshal(vpContents, &vpData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal presentation: %w", err)
 	}
@@ -191,7 +186,7 @@ func buildVPOptions(opts *vpVerifyOptions) []vp.PresentationOpt {
 		vpOpts = append(vpOpts, vp.WithVerificationMethodKey(opts.verificationMethodKey))
 	}
 
-	if opts.isVerifyProof && opts.resolver == nil {
+	if opts.isVerifyProof {
 		vpOpts = append(vpOpts, vp.WithVerifyProof())
 	}
 
@@ -202,17 +197,17 @@ func buildVPOptions(opts *vpVerifyOptions) []vp.PresentationOpt {
 	return vpOpts
 }
 
-func verifyVPProofWithResolver(presentation []byte, resolver verificationmethod.ResolverProvider) error {
-	verifier := credentialjwt.NewJWTVerifierWithResolver(resolver)
-	if err := verifier.VerifyJWT(string(presentation)); err != nil {
-		return fmt.Errorf("failed to verify presentation: %w", err)
-	}
+// func verifyVPProofWithResolver(presentation []byte, resolver verificationmethod.ResolverProvider) error {
+// 	verifier := credentialjwt.NewJWTVerifierWithResolver(resolver)
+// 	if err := verifier.VerifyJWT(string(presentation)); err != nil {
+// 		return fmt.Errorf("failed to verify presentation: %w", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // extractHolderDIDFromData extracts the holder DID from the unmarshaled VP data.
-func extractHolderDIDFromData(vpData presentationData) (string, error) {
+func extractHolderDIDFromData(vpData model.PresentationData) (string, error) {
 	if vpData.Holder == "" {
 		return "", fmt.Errorf("holder must be a non-empty string")
 	}
@@ -222,7 +217,7 @@ func extractHolderDIDFromData(vpData presentationData) (string, error) {
 
 // extractVCTokens extracts all embedded VC tokens from the VP data.
 // Each VC is returned as an AuthResponse containing the raw JWT token.
-func extractVCTokens(vpData presentationData) ([]*model.AuthResponse, error) {
+func extractVCTokens(vpData model.PresentationData) ([]*model.AuthResponse, error) {
 	if vpData.VerifiableCredential == nil {
 		return nil, fmt.Errorf("no embedded credentials found in presentation")
 	}

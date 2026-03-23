@@ -29,3 +29,9 @@ type VPVerifyResult struct {
 	HolderDID string          // The holder DID from the presentation
 	VCs       []*AuthResponse // Raw VC tokens extracted from the presentation
 }
+
+// PresentationData represents the VP fields needed by the verifier.
+type PresentationData struct {
+	Holder               string   `json:"holder"`
+	VerifiableCredential []string `json:"verifiableCredential"`
+}
