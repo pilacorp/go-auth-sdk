@@ -288,17 +288,17 @@ func createTestVCToken(t *testing.T, issuerDID, holderDID string, issuerKey []by
 	}
 
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
-	builder := NewAuthBuilder(
-		WithBuilderSchemaID("https://example.com/schema/v1"),
-		WithSigner(ecdsaSigner),
+	builder := NewVCBuilder(
+		WithVCBuilderSchemaID("https://example.com/schema/v1"),
+		WithVCSigner(ecdsaSigner),
 	)
 
-	result, err := builder.Build(ctx, model.AuthData{
+	result, err := builder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           p,
 		CredentialStatus: statuses,
-	}, WithSignerOptions(signer.WithPrivateKey(issuerKey)))
+	}, WithVCSignerOptions(signer.WithPrivateKey(issuerKey)))
 	if err != nil {
 		t.Fatalf("failed to create test VC: %v", err)
 	}

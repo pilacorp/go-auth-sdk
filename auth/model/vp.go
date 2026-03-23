@@ -26,8 +26,8 @@ type VPResponse struct {
 // It contains the extracted holder DID and raw VC tokens for each embedded VC.
 // Callers should parse and verify each VC token based on their own business logic.
 type VPVerifyResult struct {
-	HolderDID string          // The holder DID from the presentation
-	VCs       []*AuthResponse // Raw VC tokens extracted from the presentation
+	HolderDID string        // The holder DID from the presentation
+	VCs       []*VCResponse // Raw VC tokens extracted from the presentation
 }
 
 // PresentationData represents the VP fields needed by the verifier.

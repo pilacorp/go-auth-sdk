@@ -67,7 +67,7 @@ func createTestCredentialJSONWithoutPermissions(issuerDID, holderDID string) []b
 }
 
 func TestVerify_EmptyCredential(t *testing.T) {
-	_, err := Verify(context.Background(), []byte{}, WithVerifyProof())
+	_, err := VerifyCredential(context.Background(), []byte{}, WithVerifyProof())
 	if err == nil {
 		t.Error("Verify() should return error for empty credential")
 	}
@@ -77,7 +77,7 @@ func TestVerify_EmptyCredential(t *testing.T) {
 }
 
 func TestVerify_InvalidJSON(t *testing.T) {
-	_, err := Verify(context.Background(), []byte("invalid json"), WithVerifyProof())
+	_, err := VerifyCredential(context.Background(), []byte("invalid json"), WithVerifyProof())
 	if err == nil {
 		t.Error("Verify() should return error for invalid JSON")
 	}
@@ -351,7 +351,7 @@ func TestExtractCredentialData_PermissionsAsPolicy(t *testing.T) {
 }
 
 func TestVerifyOptions_WithDIDBaseURL(t *testing.T) {
-	opts, err := getVerifyOptions(WithDIDBaseURL("https://custom.did.url"))
+	opts, err := getVCVerifyOptions(WithDIDBaseURL("https://custom.did.url"))
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -390,7 +390,7 @@ func TestVerifyOptions_InvalidDIDBaseURL(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := getVerifyOptions(WithDIDBaseURL(tc.baseURL))
+			_, err := getVCVerifyOptions(WithDIDBaseURL(tc.baseURL))
 			if err == nil {
 				t.Error("getVerifyOptions() should return error for invalid URL")
 				return
@@ -415,7 +415,7 @@ func TestVerifyOptions_ValidURLs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			opts, err := getVerifyOptions(WithDIDBaseURL(tc.baseURL))
+			opts, err := getVCVerifyOptions(WithDIDBaseURL(tc.baseURL))
 			if err != nil {
 				t.Errorf("getVerifyOptions() with valid URL %q returned error: %v", tc.baseURL, err)
 			}
@@ -427,7 +427,7 @@ func TestVerifyOptions_ValidURLs(t *testing.T) {
 }
 
 func TestVerifyOptions_WithVerificationMethodKey(t *testing.T) {
-	opts, err := getVerifyOptions(WithVerificationMethodKey("key-2"))
+	opts, err := getVCVerifyOptions(WithVerificationMethodKey("key-2"))
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -437,7 +437,7 @@ func TestVerifyOptions_WithVerificationMethodKey(t *testing.T) {
 }
 
 func TestVerifyOptions_WithVerifyProof(t *testing.T) {
-	opts, err := getVerifyOptions(WithVerifyProof())
+	opts, err := getVCVerifyOptions(WithVerifyProof())
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -447,7 +447,7 @@ func TestVerifyOptions_WithVerifyProof(t *testing.T) {
 }
 
 func TestVerifyOptions_WithCheckExpiration(t *testing.T) {
-	opts, err := getVerifyOptions(WithCheckExpiration())
+	opts, err := getVCVerifyOptions(WithCheckExpiration())
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -457,7 +457,7 @@ func TestVerifyOptions_WithCheckExpiration(t *testing.T) {
 }
 
 func TestVerifyOptions_WithCheckRevocation(t *testing.T) {
-	opts, err := getVerifyOptions(WithCheckRevocation())
+	opts, err := getVCVerifyOptions(WithCheckRevocation())
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -467,7 +467,7 @@ func TestVerifyOptions_WithCheckRevocation(t *testing.T) {
 }
 
 func TestVerifyOptions_WithSchemaValidation(t *testing.T) {
-	opts, err := getVerifyOptions(WithSchemaValidation())
+	opts, err := getVCVerifyOptions(WithSchemaValidation())
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -477,7 +477,7 @@ func TestVerifyOptions_WithSchemaValidation(t *testing.T) {
 }
 
 func TestVerifyOptions_WithVerifyPermissions(t *testing.T) {
-	opts, err := getVerifyOptions(WithVerifyPermissions())
+	opts, err := getVCVerifyOptions(WithVerifyPermissions())
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -492,7 +492,7 @@ func TestVerifyOptions_WithSpecification(t *testing.T) {
 		[]policy.ActionVerb{policy.ActionVerbCreate},
 		[]policy.ResourceObject{policy.ResourceObjectIssuer},
 	)
-	opts, err := getVerifyOptions(WithSpecification(customSpec))
+	opts, err := getVCVerifyOptions(WithSpecification(customSpec))
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -505,7 +505,7 @@ func TestVerifyOptions_WithSpecification(t *testing.T) {
 }
 
 func TestVerifyOptions_WithSchemaID(t *testing.T) {
-	opts, err := getVerifyOptions(WithVerifySchemaID("https://example.com/schema"))
+	opts, err := getVCVerifyOptions(WithVerifySchemaID("https://example.com/schema"))
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -515,7 +515,7 @@ func TestVerifyOptions_WithSchemaID(t *testing.T) {
 }
 
 func TestVerifyOptions_DefaultValues(t *testing.T) {
-	opts, err := getVerifyOptions()
+	opts, err := getVCVerifyOptions()
 	if err != nil {
 		t.Fatalf("getVerifyOptions() error = %v", err)
 	}
@@ -543,7 +543,7 @@ func TestVerifyOptions_DefaultValues(t *testing.T) {
 }
 
 func TestVerifyOptions_MultipleOptions(t *testing.T) {
-	opts, err := getVerifyOptions(
+	opts, err := getVCVerifyOptions(
 		WithDIDBaseURL("https://custom.url"),
 		WithVerificationMethodKey("key-3"),
 		WithVerifyProof(),
@@ -586,7 +586,7 @@ func TestVerify_WithSchemaID_Match(t *testing.T) {
 	)
 
 	// Verify with matching schema ID
-	result, err := Verify(ctx, credJSON, WithVerifySchemaID("https://example.com/schema"))
+	result, err := VerifyCredential(ctx, credJSON, WithVerifySchemaID("https://example.com/schema"))
 	if err != nil {
 		t.Fatalf("Verify() with matching schema ID error = %v, want nil", err)
 	}
@@ -614,7 +614,7 @@ func TestVerify_WithSchemaID_Mismatch(t *testing.T) {
 	)
 
 	// Verify with a different expected schema ID
-	_, err := Verify(ctx, credJSON, WithVerifySchemaID("https://other.com/schema"))
+	_, err := VerifyCredential(ctx, credJSON, WithVerifySchemaID("https://other.com/schema"))
 	if err == nil {
 		t.Fatalf("Verify() with mismatched schema ID error = nil, want non-nil")
 	}
@@ -719,7 +719,7 @@ func TestVerify_WithSchemaLoader(t *testing.T) {
 		return []byte(`{"type":"object"}`), nil
 	}
 
-	result, err := Verify(
+	result, err := VerifyCredential(
 		ctx,
 		credJSON,
 		WithSchemaValidation(),

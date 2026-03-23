@@ -158,7 +158,7 @@ func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
 	}
 }
 
-// Verify is the main entry point for credential verification.
+// VerifyCredential is the main entry point for credential verification.
 // It performs a comprehensive verification of a Verifiable Credential including:
 //   - Parsing the credential (supports both JWT and JSON-LD formats)
 //   - Validating the credential structure (required VC fields)
@@ -173,7 +173,7 @@ func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
 //
 // Example usage:
 //
-//	result, err := Verify(credentialBytes,
+//	result, err := VerifyCredential(credentialBytes,
 //		WithVerifyProof(),
 //		WithCheckExpiration(),
 //		WithDIDBaseURL("https://api.example.com/did"),
@@ -182,12 +182,12 @@ func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
 //		// Handle verification error
 //	}
 //	// Use result.IssuerDID, result.HolderDID, result.Permissions
-func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*model.VerifyResult, error) {
+func VerifyCredential(ctx context.Context, credential []byte, opts ...VerifyOpt) (*model.VCVerifyResult, error) {
 	if len(credential) == 0 {
 		return nil, fmt.Errorf("credential is empty")
 	}
 
-	verifyOpts, err := getVerifyOptions(opts...)
+	verifyOpts, err := getVCVerifyOptions(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verify options: %w", err)
 	}
@@ -227,7 +227,7 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*model.V
 		}
 	}
 
-	return &model.VerifyResult{
+	return &model.VCVerifyResult{
 		IssuerDID:   issuerDID,
 		HolderDID:   holderDID,
 		Permissions: permissions,
@@ -329,9 +329,9 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 	return credOpts
 }
 
-// getVerifyOptions returns the verification options with defaults applied.
+// getVCVerifyOptions returns the verification options with defaults applied.
 // It processes all provided options and returns a configured verifyOptions struct.
-func getVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
+func getVCVerifyOptions(opts ...VerifyOpt) (*verifyOptions, error) {
 	defaultSpec := policy.DefaultSpecification()
 	options := &verifyOptions{
 		didBaseURL:            "https://api.ndadid.vn/api/v1/did",

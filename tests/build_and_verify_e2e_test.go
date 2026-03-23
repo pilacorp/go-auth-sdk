@@ -63,22 +63,22 @@ func TestBuildAndVerify(t *testing.T) {
 
 	// Create signer and builder
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
-	authBuilder := builder.NewAuthBuilder(
-		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
-		builder.WithSigner(ecdsaSigner),
+	authBuilder := builder.NewVCBuilder(
+		builder.WithVCBuilderSchemaID("https://example.com/schema/v1"),
+		builder.WithVCSigner(ecdsaSigner),
 	)
 
 	validFrom := time.Now()
 	validUntil := time.Now().Add(5 * time.Minute)
 
-	buildResult, err := authBuilder.Build(ctx, model.AuthData{
+	buildResult, err := authBuilder.Build(ctx, model.VCData{
 		IssuerDID:        "did:e2e:issuer",
 		HolderDID:        "did:e2e:holder",
 		Policy:           p,
 		ValidFrom:        &validFrom,
 		ValidUntil:       &validUntil,
 		CredentialStatus: statuses,
-	}, builder.WithSignerOptions(signer.WithPrivateKey(privKeyBytes)))
+	}, builder.WithVCSignerOptions(signer.WithPrivateKey(privKeyBytes)))
 	if err != nil {
 		t.Fatalf("Build() error = %v", err)
 	}
@@ -89,7 +89,7 @@ func TestBuildAndVerify(t *testing.T) {
 	// For E2E we call Verify, but keep it simple and fully offline:
 	// - Use a mocked DID base URL to avoid real network calls.
 	// - Only enable expiration check; proof verification uses external DID resolution.
-	verifyResult, err := verifier.Verify(
+	verifyResult, err := verifier.VerifyCredential(
 		ctx,
 		[]byte(buildResult.Token),
 		verifier.WithDIDBaseURL(didServer.URL),

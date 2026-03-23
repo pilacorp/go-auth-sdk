@@ -83,27 +83,27 @@ func TestVerifyPresentationFlow(t *testing.T) {
 	}
 
 	issuerSigner := ecdsa.NewPrivSigner(nil)
-	vcBuilder := builder.NewAuthBuilder(
-		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
-		builder.WithSigner(issuerSigner),
+	vcBuilder := builder.NewVCBuilder(
+		builder.WithVCBuilderSchemaID("https://example.com/schema/v1"),
+		builder.WithVCSigner(issuerSigner),
 	)
 
-	vcA, err := vcBuilder.Build(ctx, model.AuthData{
+	vcA, err := vcBuilder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           policy1,
 		CredentialStatus: credentialStatus,
-	}, builder.WithSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
+	}, builder.WithVCSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
 	if err != nil {
 		t.Fatalf("build vcA: %v", err)
 	}
 
-	vcB, err := vcBuilder.Build(ctx, model.AuthData{
+	vcB, err := vcBuilder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           policy2,
 		CredentialStatus: credentialStatus,
-	}, builder.WithSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
+	}, builder.WithVCSignerOptions(signer.WithPrivateKey(issuerKeyBytes)))
 	if err != nil {
 		t.Fatalf("build vcB: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestVerifyPresentationFlow(t *testing.T) {
 	// Verify each VC token separately (callers should verify each VC based on their business logic)
 	actions := map[string]bool{}
 	for i, vc := range result.VCs {
-		vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+		vcResult, err := verifier.VerifyCredential(ctx, []byte(vc.Token),
 			verifier.WithVerifyProof(),
 			verifier.WithCheckExpiration(),
 			verifier.WithVerifyPermissions(),

@@ -1,6 +1,6 @@
 # Examples
 
-This directory contains runnable examples demonstrating Auth SDK usage.
+This directory contains runnable examples demonstrating Go Auth SDK usage.
 
 ## Examples
 
@@ -84,23 +84,23 @@ credentialStatus := []vc.Status{
 // Create signer
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
-// Create AuthBuilder
-builder := builder.NewAuthBuilder(
-    builder.WithBuilderSchemaID("https://example.com/schema/v1"),
-    builder.WithSigner(ecdsaSigner),
+// Create VCBuilder
+builder := builder.NewVCBuilder(
+    builder.WithVCBuilderSchemaID("https://example.com/schema/v1"),
+    builder.WithVCSigner(ecdsaSigner),
 )
 
 // Build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, err := builder.Build(context.Background(), model.AuthData{
+result, err := builder.Build(context.Background(), model.VCData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
     ValidFrom:        &validFrom,
     ValidUntil:       &validUntil,
     CredentialStatus: credentialStatus,
-}, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+}, builder.WithVCSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 
 if err != nil {
     // Handle error
@@ -112,7 +112,7 @@ if err != nil {
 ```go
 import "github.com/pilacorp/go-auth-sdk/auth/verifier"
 
-result, err := verifier.Verify(
+result, err := verifier.VerifyCredential(
     context.Background(),
     credentialBytes,
     verifier.WithVerifyProof(),
@@ -163,7 +163,7 @@ if err != nil {
 
 // Verify each embedded VC independently based on your business logic
 for i, vc := range vpResult.VCs {
-    vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+    vcResult, err := verifier.VerifyCredential(ctx, []byte(vc.Token),
         verifier.WithVerifyProof(),
         verifier.WithCheckExpiration(),
         verifier.WithVerifyPermissions(),
