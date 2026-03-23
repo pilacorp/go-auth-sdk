@@ -19,8 +19,8 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-// AuthBuilderConfig is a configuration for the AuthBuilder.
-type AuthBuilderConfig struct {
+// VCBuilderConfig is a configuration for the VCBuilder.
+type VCBuilderConfig struct {
 	// Credential configuration
 	schemaID string
 
@@ -29,40 +29,40 @@ type AuthBuilderConfig struct {
 	signerOptions []signer.SignOption
 }
 
-// AuthBuilder is a builder for creating and signing VC-JWT credentials with embedded permissions.
-type AuthBuilder struct {
-	config *AuthBuilderConfig
+// VCBuilder is a builder for creating and signing VC-JWT credentials with embedded permissions.
+type VCBuilder struct {
+	config *VCBuilderConfig
 }
 
-// AuthBuilderConfigOption is a function that configures the AuthBuilderConfig.
-type AuthBuilderConfigOption func(*AuthBuilderConfig)
+// VCBuilderConfigOption is a function that configures the VCBuilderConfig.
+type VCBuilderConfigOption func(*VCBuilderConfig)
 
-// WithBuilderSchemaID sets the schema ID for the AuthBuilder.
-func WithBuilderSchemaID(schemaID string) AuthBuilderConfigOption {
-	return func(b *AuthBuilderConfig) {
+// WithBuilderSchemaID sets the schema ID for the VCBuilder.
+func WithBuilderSchemaID(schemaID string) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
 		b.schemaID = schemaID
 	}
 }
 
-// WithSignerOptions sets the signer options for the AuthBuilder.
-func WithSignerOptions(opts ...signer.SignOption) AuthBuilderConfigOption {
-	return func(b *AuthBuilderConfig) {
+// WithSignerOptions sets the signer options for the VCBuilder.
+func WithSignerOptions(opts ...signer.SignOption) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
 		b.signerOptions = opts
 	}
 }
 
-// WithSigner sets the signer for the AuthBuilder.
-func WithSigner(signer signer.Signer) AuthBuilderConfigOption {
-	return func(b *AuthBuilderConfig) {
+// WithSigner sets the signer for the VCBuilder.
+func WithSigner(signer signer.Signer) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
 		if signer != nil {
 			b.signer = signer
 		}
 	}
 }
 
-// NewAuthBuilder creates a new AuthBuilder with the given config options“.
-func NewAuthBuilder(opts ...AuthBuilderConfigOption) *AuthBuilder {
-	config := &AuthBuilderConfig{
+// NewVCBuilder creates a new VCBuilder with the given config options“.
+func NewVCBuilder(opts ...VCBuilderConfigOption) *VCBuilder {
+	config := &VCBuilderConfig{
 		signer: ecdsa.NewPrivSigner(nil),
 	}
 
@@ -72,16 +72,16 @@ func NewAuthBuilder(opts ...AuthBuilderConfigOption) *AuthBuilder {
 		}
 	}
 
-	return &AuthBuilder{
+	return &VCBuilder{
 		config: config,
 	}
 }
 
 // Build creates and signs the VC-JWT payload using the configured signer.
-func (b *AuthBuilder) Build(ctx context.Context, data model.AuthData, opts ...AuthBuilderConfigOption) (*model.AuthResponse, error) {
+func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuilderConfigOption) (*model.VCResponse, error) {
 	options := b.mergeConfig(opts...)
 
-	if err := validateAuthData(data, options); err != nil {
+	if err := validateVCData(data, options); err != nil {
 		return nil, err
 	}
 	// Build credential subject with permissions
@@ -166,13 +166,13 @@ func (b *AuthBuilder) Build(ctx context.Context, data model.AuthData, opts ...Au
 		return nil, fmt.Errorf("invalid token type: expected string")
 	}
 
-	return &model.AuthResponse{
+	return &model.VCResponse{
 		Token: token,
 	}, nil
 }
 
-// validateAuthData validates that the required fields in model.AuthData are present.
-func validateAuthData(data model.AuthData, options *AuthBuilderConfig) error {
+// validateVCData validates that the required fields in model.VCData are present.
+func validateVCData(data model.VCData, options *VCBuilderConfig) error {
 	if options.schemaID == "" {
 		return fmt.Errorf("schema ID is required")
 	}
@@ -201,9 +201,9 @@ func validateAuthData(data model.AuthData, options *AuthBuilderConfig) error {
 }
 
 // mergeConfig merges the options into the builder config.
-func (b *AuthBuilder) mergeConfig(opts ...AuthBuilderConfigOption) *AuthBuilderConfig {
+func (b *VCBuilder) mergeConfig(opts ...VCBuilderConfigOption) *VCBuilderConfig {
 	// merge the options into the builder config
-	options := &AuthBuilderConfig{
+	options := &VCBuilderConfig{
 		schemaID:      b.config.schemaID,
 		signer:        b.config.signer,
 		signerOptions: make([]signer.SignOption, len(b.config.signerOptions)),

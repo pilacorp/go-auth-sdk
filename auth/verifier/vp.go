@@ -217,7 +217,7 @@ func extractHolderDIDFromData(vpData model.PresentationData) (string, error) {
 
 // extractVCTokens extracts all embedded VC tokens from the VP data.
 // Each VC is returned as an AuthResponse containing the raw JWT token.
-func extractVCTokens(vpData model.PresentationData) ([]*model.AuthResponse, error) {
+func extractVCTokens(vpData model.PresentationData) ([]*model.VCResponse, error) {
 	if vpData.VerifiableCredential == nil {
 		return nil, fmt.Errorf("no embedded credentials found in presentation")
 	}
@@ -226,9 +226,9 @@ func extractVCTokens(vpData model.PresentationData) ([]*model.AuthResponse, erro
 		return nil, fmt.Errorf("verifiableCredential array is empty")
 	}
 
-	tokens := make([]*model.AuthResponse, 0, len(vpData.VerifiableCredential))
+	tokens := make([]*model.VCResponse, 0, len(vpData.VerifiableCredential))
 	for _, token := range vpData.VerifiableCredential {
-		tokens = append(tokens, &model.AuthResponse{Token: token})
+		tokens = append(tokens, &model.VCResponse{Token: token})
 	}
 
 	return tokens, nil

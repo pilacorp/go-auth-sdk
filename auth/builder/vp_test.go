@@ -288,12 +288,12 @@ func createTestVCToken(t *testing.T, issuerDID, holderDID string, issuerKey []by
 	}
 
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
-	builder := NewAuthBuilder(
+	builder := NewVCBuilder(
 		WithBuilderSchemaID("https://example.com/schema/v1"),
 		WithSigner(ecdsaSigner),
 	)
 
-	result, err := builder.Build(ctx, model.AuthData{
+	result, err := builder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           p,

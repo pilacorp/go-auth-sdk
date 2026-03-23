@@ -83,12 +83,12 @@ func TestVerifyPresentationFlow(t *testing.T) {
 	}
 
 	issuerSigner := ecdsa.NewPrivSigner(nil)
-	vcBuilder := builder.NewAuthBuilder(
+	vcBuilder := builder.NewVCBuilder(
 		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
 		builder.WithSigner(issuerSigner),
 	)
 
-	vcA, err := vcBuilder.Build(ctx, model.AuthData{
+	vcA, err := vcBuilder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           policy1,
@@ -98,7 +98,7 @@ func TestVerifyPresentationFlow(t *testing.T) {
 		t.Fatalf("build vcA: %v", err)
 	}
 
-	vcB, err := vcBuilder.Build(ctx, model.AuthData{
+	vcB, err := vcBuilder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           policy2,
@@ -143,7 +143,7 @@ func TestVerifyPresentationFlow(t *testing.T) {
 	// Verify each VC token separately (callers should verify each VC based on their business logic)
 	actions := map[string]bool{}
 	for i, vc := range result.VCs {
-		vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+		vcResult, err := verifier.VCVerify(ctx, []byte(vc.Token),
 			verifier.WithVerifyProof(),
 			verifier.WithCheckExpiration(),
 			verifier.WithVerifyPermissions(),

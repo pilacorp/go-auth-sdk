@@ -39,10 +39,10 @@ go get github.com/pilacorp/go-auth-sdk
 - **Holder (presentation)**: uses `builder.NewVPBuilder(...).Build(...)` to create a VP-JWT from one or many VC-JWTs.
 - **Service (presentation)**: uses `verifier.VerifyPresentation` to verify VP, then parses and verifies each embedded VC independently based on business logic.
 
-#### 2. Input Structure for Building: `AuthData`
+#### 2. Input Structure for Building: `VCData`
 
 ```go
-type AuthData struct {
+type VCData struct {
 	ID               string        // optional: credential ID, SDK auto-generates UUID if empty
 	IssuerDID        string        // required: Issuer DID (the credential signer)
 	HolderDID        string        // required: Holder DID (credentialSubject.id)
@@ -94,7 +94,7 @@ p := policy.NewPolicy(
   - Data type: `[]vc.Status`.
   - Each time a new credential is built, the Issuer needs **at least one status entry** corresponding to the status service, then assigns it to this field.
   - Two main approaches:
-    - **Use SDK's `StatusBuilder` interface**: implement `StatusBuilder` interface or use the default `auth.NewStatusBuilder()` which calls the status registry API and returns `[]vc.Status`.
+    - **Use SDK's `StatusBuilder` interface**: implement `status.StatusBuilder` interface or use the default `status.NewStatusBuilder()` which calls the status registry API and returns `[]vc.Status`.
     - **Manually create `vc.Status` struct**: if you already have status information, simply initialize according to the template below and assign to `CredentialStatus`.
 
 **Creating Status with StatusBuilder:**
@@ -105,7 +105,7 @@ The SDK provides a `StatusBuilder` interface to help create credential status en
 
 ```go
 // Create a StatusBuilder using the default implementation
-statusBuilder := auth.NewStatusBuilder(
+statusBuilder := status.NewStatusBuilder(
 	"Bearer <issuer-access-token>",
 	"https://api.ndadid.vn/api/v1/credentials/status/register",
 )
@@ -116,7 +116,7 @@ if err != nil {
 	log.Fatalf("create status error: %v", err)
 }
 
-// Use statuses in AuthData.CredentialStatus
+// Use statuses in VCData.CredentialStatus
 ```
 
 **Method 2: Implement your own StatusBuilder**
@@ -130,8 +130,8 @@ type MyStatusBuilder struct {
 	AuthToken string
 }
 
-// Ensure MyStatusBuilder implements auth.StatusBuilder
-var _ auth.StatusBuilder = (*MyStatusBuilder)(nil)
+// Ensure MyStatusBuilder implements status.StatusBuilder
+var _ status.StatusBuilder = (*MyStatusBuilder)(nil)
 
 func (b *MyStatusBuilder) CreateStatus(ctx context.Context, issuerDID string) ([]vc.Status, error) {
 	// Your custom logic here (HTTP call, DB lookup, etc.)
@@ -154,7 +154,7 @@ statusBuilder := &MyStatusBuilder{
 }
 
 statuses, err := statusBuilder.CreateStatus(ctx, issuerDID)
-// Use statuses in AuthData.CredentialStatus
+// Use statuses in VCData.CredentialStatus
 ```
 
 **Method 3: Manually create vc.Status**
@@ -171,7 +171,7 @@ statuses := []vc.Status{
 		StatusListCredential: "https://.../credentials/status/0",
 	},
 }
-// Use statuses directly in AuthData.CredentialStatus
+// Use statuses directly in VCData.CredentialStatus
 ```
 
 #### 3. Signer (Signing Credentials)
@@ -240,6 +240,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/builder"
 	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	"github.com/pilacorp/go-auth-sdk/auth/status"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 )
@@ -247,7 +248,7 @@ import (
 ctx := context.Background()
 
 // Create status using StatusBuilder (see section 2 above for details)
-statusBuilder := auth.NewStatusBuilder(
+statusBuilder := status.NewStatusBuilder(
 	"Bearer <issuer-access-token>",
 	"https://api.ndadid.vn/api/v1/credentials/status/register",
 )
@@ -268,8 +269,8 @@ p := policy.NewPolicy(policy.WithStatements(stmt))
 // Create signer
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
-// Create AuthBuilder with schema ID
-authBuilder := builder.NewAuthBuilder(
+// Create VCBuilder with schema ID
+vcBuilder := builder.NewVCBuilder(
 	builder.WithBuilderSchemaID("https://example.com/schema/v1"),
 	builder.WithSigner(ecdsaSigner),
 )
@@ -277,7 +278,7 @@ authBuilder := builder.NewAuthBuilder(
 // Build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, err := authBuilder.Build(ctx, model.AuthData{
+result, err := vcBuilder.Build(ctx, model.VCData{
 	IssuerDID:        "did:nda:testnet:0xISSUER",
 	HolderDID:        "did:nda:testnet:0xHOLDER",
 	Policy:           p,

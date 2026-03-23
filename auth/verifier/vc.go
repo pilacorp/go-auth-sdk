@@ -158,7 +158,7 @@ func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
 	}
 }
 
-// Verify is the main entry point for credential verification.
+// VCVerify is the main entry point for credential verification.
 // It performs a comprehensive verification of a Verifiable Credential including:
 //   - Parsing the credential (supports both JWT and JSON-LD formats)
 //   - Validating the credential structure (required VC fields)
@@ -173,7 +173,7 @@ func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
 //
 // Example usage:
 //
-//	result, err := Verify(credentialBytes,
+//	result, err := VCVerify(credentialBytes,
 //		WithVerifyProof(),
 //		WithCheckExpiration(),
 //		WithDIDBaseURL("https://api.example.com/did"),
@@ -182,7 +182,7 @@ func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
 //		// Handle verification error
 //	}
 //	// Use result.IssuerDID, result.HolderDID, result.Permissions
-func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*model.VerifyResult, error) {
+func VCVerify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*model.VCVerifyResult, error) {
 	if len(credential) == 0 {
 		return nil, fmt.Errorf("credential is empty")
 	}
@@ -227,7 +227,7 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*model.V
 		}
 	}
 
-	return &model.VerifyResult{
+	return &model.VCVerifyResult{
 		IssuerDID:   issuerDID,
 		HolderDID:   holderDID,
 		Permissions: permissions,

@@ -68,8 +68,8 @@ func main() {
 	validFrom := time.Now()
 	validUntil := time.Now().Add(24 * time.Hour)
 
-	authBuilder := builder.NewAuthBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
-	result, err := authBuilder.Build(ctx, model.AuthData{
+	authBuilder := builder.NewVCBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
+	result, err := authBuilder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        "did:example:holder",
 		Policy:           policy,
@@ -86,7 +86,7 @@ func main() {
 
 	// Step 6: Verify credential
 	fmt.Println("Verifying credential...")
-	verifyResult, err := verifier.Verify(
+	verifyResult, err := verifier.VCVerify(
 		ctx,
 		[]byte(result.Token),
 		verifier.WithVerifyProof(),

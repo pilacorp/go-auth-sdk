@@ -283,12 +283,12 @@ func createTestVCToken(t *testing.T, issuerDID, holderDID string, issuerKeyBytes
 
 	ctx := context.Background()
 
-	authBuilder := builder.NewAuthBuilder(
+	authBuilder := builder.NewVCBuilder(
 		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
 		builder.WithSigner(ecdsasigner.NewPrivSigner(nil)),
 	)
 
-	vcResp, err := authBuilder.Build(ctx, model.AuthData{
+	vcResp, err := authBuilder.Build(ctx, model.VCData{
 		ID:        "urn:uuid:test-vc",
 		IssuerDID: issuerDID,
 		HolderDID: holderDID,
