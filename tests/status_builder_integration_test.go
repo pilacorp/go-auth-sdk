@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pilacorp/go-auth-sdk/auth"
+	"github.com/pilacorp/go-auth-sdk/auth/status"
 )
 
 // TestStatusBuilder_UsesCustomClient verifies that NewStatusBuilder
@@ -37,10 +37,10 @@ func TestStatusBuilder_UsesCustomClient(t *testing.T) {
 	const issuerDID = "did:integration:issuer"
 	const authToken = "Bearer integration-token"
 
-	builder := auth.NewStatusBuilder(
+	builder := status.NewStatusBuilder(
 		authToken,
 		srv.URL,
-		auth.WithStatusBuilderHTTPClient(customClient),
+		status.WithStatusBuilderHTTPClient(customClient),
 	)
 
 	statuses, err := builder.CreateStatus(ctx, issuerDID)

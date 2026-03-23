@@ -1,4 +1,4 @@
-package auth
+package status
 
 import (
 	"bytes"
@@ -10,6 +10,16 @@ import (
 
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
+
+// statusRequest represents the status registration API request body
+type statusRequest struct {
+	IssuerDID string `json:"issuerDid"`
+}
+
+// statusResponse represents the status registration API response
+type statusResponse struct {
+	Data vc.Status `json:"data"`
+}
 
 // StatusBuilder defines how credential status entries are created.
 // Users can implement this interface to plug in custom status creation logic.
