@@ -2,11 +2,13 @@ package builder
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/signer"
+	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
 )
@@ -106,9 +108,39 @@ func (b *VPBuilder) Build(ctx context.Context, data model.VPData, opts ...VPBuil
 		return nil, fmt.Errorf("failed to create JWT presentation: %w", err)
 	}
 
-	token, err := signAndSerializeJWT(ctx, jwtPresentation{presentation}, options.signer, options.signerOptions, "presentation")
+	// Sign the credential
+	// Get signing input
+	signData, err := presentation.GetSigningInput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get signing input: %w", err)
+	}
+
+	// Hash the signing data
+	hash := sha256.Sum256(signData)
+
+	// Sign the credential
+	signature, err := options.signer.Sign(ctx, hash[:], options.signerOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign credential: %w", err)
+	}
+
+	// Add proof with signature
+	err = presentation.AddCustomProof(&vcdto.Proof{
+		Signature: signature,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add proof: %w", err)
+	}
+
+	// Serialize the credential to JWT string
+	tokenStr, err := presentation.Serialize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize credential: %w", err)
+	}
+
+	token, ok := tokenStr.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid token type: expected string")
 	}
 
 	return &model.VPResponse{
