@@ -1,3 +1,9 @@
+// Package builder provides APIs for building and signing authorization credentials and presentations.
+// It supports both local private key and Vault-backed signers through the signer abstraction.
+// The package provides:
+//   - AuthBuilder: A builder for creating and signing VC-JWT credentials with embedded permissions
+//   - VPBuilder: A builder for creating and signing VP-JWT presentations with embedded VC tokens
+//   - Builder options: Configurable options for schema IDs, signer implementations, and signer options
 package builder
 
 import (

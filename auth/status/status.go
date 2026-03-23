@@ -1,3 +1,9 @@
+// Package status provides APIs for creating credential status entries used in authorization credentials.
+// It supports HTTP-based status registration with configurable client behavior.
+// The package provides:
+//   - StatusBuilder: An interface for creating credential status entries for issuer DIDs
+//   - NewStatusBuilder: A default HTTP implementation for registering status data
+//   - Status builder options: Configurable options for HTTP client and API integration
 package status
 
 import (

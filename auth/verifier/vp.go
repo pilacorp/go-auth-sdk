@@ -1,3 +1,9 @@
+// Package verifier provides APIs for verifying authorization credentials and presentations.
+// It supports proof verification with DID resolution and additional validation checks.
+// The package provides:
+//   - Verify: A function for verifying VC-JWT credentials and extracting issuer, holder, and permissions
+//   - VerifyPresentation: A function for verifying VP-JWT presentations and extracting holder and embedded VC tokens
+//   - Verification options: Configurable options for proof verification, expiration checks, schema checks, and resolvers
 package verifier
 
 import (

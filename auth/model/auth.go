@@ -1,3 +1,8 @@
+// Package model defines shared data models for authorization credentials and presentations.
+// It provides:
+//   - AuthData and VPData: Input models for building VC-JWT credentials and VP-JWT presentations
+//   - AuthResponse and VPResponse: Output models containing signed JWT tokens
+//   - VerifyResult and VPVerifyResult: Normalized verification outputs with extracted identity data
 package model
 
 import (
