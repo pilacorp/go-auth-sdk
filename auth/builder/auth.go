@@ -1,11 +1,10 @@
-// Package auth provides the main API for building JWT Authorization Credentials (VC-JWT) with embedded permission policies.
-// It supports both local private key and Vault signers.
+// Package builder provides APIs for building and signing authorization credentials and presentations.
+// It supports both local private key and Vault-backed signers through the signer abstraction.
 // The package provides:
 //   - AuthBuilder: A builder for creating and signing VC-JWT credentials with embedded permissions
-//   - Verify: A function for verifying VC-JWT credentials and extracting permissions
-//   - Verification options: Configurable options for proof verification, expiration checks, etc.
-
-package auth
+//   - VPBuilder: A builder for creating and signing VP-JWT presentations with embedded VC tokens
+//   - Builder options: Configurable options for schema IDs, signer implementations, and signer options
+package builder
 
 import (
 	"context"
@@ -13,6 +12,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
@@ -78,7 +78,7 @@ func NewAuthBuilder(opts ...AuthBuilderConfigOption) *AuthBuilder {
 }
 
 // Build creates and signs the VC-JWT payload using the configured signer.
-func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuilderConfigOption) (*AuthResponse, error) {
+func (b *AuthBuilder) Build(ctx context.Context, data model.AuthData, opts ...AuthBuilderConfigOption) (*model.AuthResponse, error) {
 	options := b.mergeConfig(opts...)
 
 	if err := validateAuthData(data, options); err != nil {
@@ -166,13 +166,13 @@ func (b *AuthBuilder) Build(ctx context.Context, data AuthData, opts ...AuthBuil
 		return nil, fmt.Errorf("invalid token type: expected string")
 	}
 
-	return &AuthResponse{
+	return &model.AuthResponse{
 		Token: token,
 	}, nil
 }
 
-// validateAuthData validates that the required fields in AuthData are present.
-func validateAuthData(data AuthData, options *AuthBuilderConfig) error {
+// validateAuthData validates that the required fields in model.AuthData are present.
+func validateAuthData(data model.AuthData, options *AuthBuilderConfig) error {
 	if options.schemaID == "" {
 		return fmt.Errorf("schema ID is required")
 	}

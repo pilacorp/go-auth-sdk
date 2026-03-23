@@ -1,4 +1,4 @@
-package auth
+package builder
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
@@ -86,7 +87,7 @@ func TestAuthBuilder_Build(t *testing.T) {
 
 	// Build credential with all options
 	builder := NewAuthBuilder(WithBuilderSchemaID(schemaID), WithSigner(ecdsaSigner))
-	result, err := builder.Build(ctx, AuthData{
+	result, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           testPolicy,
@@ -129,7 +130,7 @@ func TestAuthBuilder_WithSigner_NilPreservesDefault(t *testing.T) {
 	// Create builder with WithSigner(nil) - should preserve default signer
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(nil))
 
-	result, err := builder.Build(ctx, AuthData{
+	result, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
 		Policy:           testPolicy,
@@ -154,7 +155,7 @@ func TestAuthBuilder_Build_EmptyPolicy(t *testing.T) {
 
 	emptyPolicy := policy.NewPolicy()
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
-	_, err := builder.Build(ctx, AuthData{
+	_, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
 		Policy:           emptyPolicy,
@@ -187,7 +188,7 @@ func TestAuthBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 	)
 
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
-	result, err := builder.Build(ctx, AuthData{
+	result, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
 		Policy:           testPolicy,
@@ -225,7 +226,7 @@ func TestAuthBuilder_Build_OnlyValidFrom(t *testing.T) {
 	)
 
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
-	result, err := builder.Build(ctx, AuthData{
+	result, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
 		Policy:           testPolicy,
@@ -263,7 +264,7 @@ func TestAuthBuilder_Build_MultipleCredentials(t *testing.T) {
 			),
 		)
 
-		result, err := builder.Build(ctx, AuthData{
+		result, err := builder.Build(ctx, model.AuthData{
 			IssuerDID:        "did:example:issuer",
 			HolderDID:        holderDID,
 			Policy:           testPolicy,
@@ -300,7 +301,7 @@ func TestAuthBuilder_Build_InvalidPrivateKey(t *testing.T) {
 	// Use invalid private key (too short)
 	invalidKey := []byte{1, 2, 3}
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
-	result, err := builder.Build(ctx, AuthData{
+	result, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
 		Policy:           testPolicy,
@@ -334,7 +335,7 @@ func TestAuthBuilder_Build_EmptyHolderDID(t *testing.T) {
 	)
 
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
-	result, err := builder.Build(ctx, AuthData{
+	result, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "", // Empty holder DID
 		Policy:           testPolicy,
@@ -423,7 +424,7 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 
 	// Build credential with Vault signer
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(vaultSigner))
-	result, err := builder.Build(ctx, AuthData{
+	result, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
 		Policy:           testPolicy,
@@ -468,7 +469,7 @@ func TestAuthBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
 
 	// Build without signer address - should fail
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(vaultSigner))
-	result, err := builder.Build(ctx, AuthData{
+	result, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder",
 		Policy:           testPolicy,
@@ -519,7 +520,7 @@ func TestAuthBuilder_Build_OverrideSigner(t *testing.T) {
 	builder := NewAuthBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(signer1))
 
 	// Build with signer1 (default from builder)
-	result1, err := builder.Build(ctx, AuthData{
+	result1, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder1",
 		Policy:           testPolicy,
@@ -533,7 +534,7 @@ func TestAuthBuilder_Build_OverrideSigner(t *testing.T) {
 	}
 
 	// Build with signer2 (override in Build call)
-	result2, err := builder.Build(ctx, AuthData{
+	result2, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder2",
 		Policy:           testPolicy,
@@ -548,7 +549,7 @@ func TestAuthBuilder_Build_OverrideSigner(t *testing.T) {
 
 	// Verify that builder's original signer is not changed (immutability)
 	// Build again without override should still use signer1
-	result3, err := builder.Build(ctx, AuthData{
+	result3, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder3",
 		Policy:           testPolicy,
@@ -597,7 +598,7 @@ func TestAuthBuilder_Build_OverrideSchemaID(t *testing.T) {
 	builder := NewAuthBuilder(WithBuilderSchemaID(schemaID1), WithSigner(ecdsaSigner))
 
 	// Build with schemaID1 (default from builder)
-	result1, err := builder.Build(ctx, AuthData{
+	result1, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder1",
 		Policy:           testPolicy,
@@ -611,7 +612,7 @@ func TestAuthBuilder_Build_OverrideSchemaID(t *testing.T) {
 	}
 
 	// Build with schemaID2 (override in Build call)
-	result2, err := builder.Build(ctx, AuthData{
+	result2, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder2",
 		Policy:           testPolicy,
@@ -626,7 +627,7 @@ func TestAuthBuilder_Build_OverrideSchemaID(t *testing.T) {
 
 	// Verify that builder's original schemaID is not changed (immutability)
 	// Build again without override should still use schemaID1
-	result3, err := builder.Build(ctx, AuthData{
+	result3, err := builder.Build(ctx, model.AuthData{
 		IssuerDID:        "did:example:issuer",
 		HolderDID:        "did:example:holder3",
 		Policy:           testPolicy,

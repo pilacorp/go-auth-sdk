@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pilacorp/go-auth-sdk/auth"
+	"github.com/pilacorp/go-auth-sdk/auth/builder"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
@@ -84,19 +85,19 @@ func main() {
 	fmt.Println("✓ Created credential status")
 
 	// Step 7: Create AuthBuilder
-	builder := auth.NewAuthBuilder(auth.WithBuilderSchemaID(schemaID), auth.WithSigner(ecdsaSigner))
+	authBuilder := builder.NewAuthBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
 	fmt.Println("✓ Created AuthBuilder")
 
 	// Step 8: Build the credential
 	holderDID := "did:example:holder"
-	result, err := builder.Build(ctx, auth.AuthData{
+	result, err := authBuilder.Build(ctx, model.AuthData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           testPolicy,
 		ValidFrom:        &validFrom,
 		ValidUntil:       &validUntil,
 		CredentialStatus: credentialStatus,
-	}, auth.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 	if err != nil {
 		log.Fatalf("Failed to build credential: %v", err)
 	}

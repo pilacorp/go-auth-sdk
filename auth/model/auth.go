@@ -1,4 +1,9 @@
-package auth
+// Package model defines shared data models for authorization credentials and presentations.
+// It provides:
+//   - AuthData and VPData: Input models for building VC-JWT credentials and VP-JWT presentations
+//   - AuthResponse and VPResponse: Output models containing signed JWT tokens
+//   - VerifyResult and VPVerifyResult: Normalized verification outputs with extracted identity data
+package model
 
 import (
 	"encoding/json"
@@ -45,19 +50,9 @@ type credentialSchema struct {
 	Type string `json:"type"`
 }
 
-// credentialData represents the structure of credential data (without proof).
-type credentialData struct {
+// CredentialData represents the structure of credential data (without proof).
+type CredentialData struct {
 	Issuer            string            `json:"issuer"`
 	CredentialSchema  credentialSchema  `json:"credentialSchema"`
 	CredentialSubject credentialSubject `json:"credentialSubject"`
-}
-
-// statusRequest represents the status registration API request body
-type statusRequest struct {
-	IssuerDID string `json:"issuerDid"`
-}
-
-// statusResponse represents the status registration API response
-type statusResponse struct {
-	Data vc.Status `json:"data"`
 }

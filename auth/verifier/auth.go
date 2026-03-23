@@ -1,10 +1,18 @@
-package auth
+// Package verifier provides APIs for verifying authorization credentials and presentations.
+// It supports proof verification with DID resolution and additional validation checks.
+// The package provides:
+//   - Verify: A function for verifying VC-JWT credentials and extracting issuer, holder, and permissions
+//   - VerifyPresentation: A function for verifying VP-JWT presentations and extracting holder and embedded VC tokens
+//   - Verification options: Configurable options for proof verification, expiration checks, schema checks, and resolvers
+package verifier
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
+
+	"github.com/pilacorp/go-auth-sdk/auth/model"
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
@@ -174,7 +182,7 @@ func WithResolver(resolver verificationmethod.ResolverProvider) VerifyOpt {
 //		// Handle verification error
 //	}
 //	// Use result.IssuerDID, result.HolderDID, result.Permissions
-func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyResult, error) {
+func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*model.VerifyResult, error) {
 	if len(credential) == 0 {
 		return nil, fmt.Errorf("credential is empty")
 	}
@@ -219,7 +227,7 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyR
 		}
 	}
 
-	return &VerifyResult{
+	return &model.VerifyResult{
 		IssuerDID:   issuerDID,
 		HolderDID:   holderDID,
 		Permissions: permissions,
@@ -240,8 +248,9 @@ func Verify(ctx context.Context, credential []byte, opts ...VerifyOpt) (*VerifyR
 //   - An array of Statement objects directly
 //
 // Returns an error if the credential data is malformed or required fields are missing.
+
 func extractCredentialData(credData []byte) (issuerDID, holderDID string, schemaID string, permissions []policy.Statement, err error) {
-	var cred credentialData
+	var cred model.CredentialData
 	if err = json.Unmarshal(credData, &cred); err != nil {
 		return "", "", "", nil, fmt.Errorf("failed to unmarshal credential: %w", err)
 	}

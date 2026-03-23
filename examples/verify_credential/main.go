@@ -2,15 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pilacorp/go-auth-sdk/auth"
+	"github.com/pilacorp/go-auth-sdk/auth/builder"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	"github.com/pilacorp/go-auth-sdk/auth/verifier"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -28,6 +32,12 @@ func main() {
 
 	// Step 2: Create signer
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
+
+	issuerPubHex := hex.EncodeToString(crypto.FromECDSAPub(&privateKey.PublicKey))
+	staticResolver, err := verificationmethod.NewStaticResolver(issuerPubHex)
+	if err != nil {
+		log.Fatalf("Failed to create static resolver: %v", err)
+	}
 
 	// Step 3: Create policy
 	policy := policy.NewPolicy(
@@ -58,15 +68,15 @@ func main() {
 	validFrom := time.Now()
 	validUntil := time.Now().Add(24 * time.Hour)
 
-	builder := auth.NewAuthBuilder(auth.WithBuilderSchemaID(schemaID), auth.WithSigner(ecdsaSigner))
-	result, err := builder.Build(ctx, auth.AuthData{
+	authBuilder := builder.NewAuthBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
+	result, err := authBuilder.Build(ctx, model.AuthData{
 		IssuerDID:        issuerDID,
 		HolderDID:        "did:example:holder",
 		Policy:           policy,
 		ValidFrom:        &validFrom,
 		ValidUntil:       &validUntil,
 		CredentialStatus: credentialStatus,
-	}, auth.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 	if err != nil {
 		log.Fatalf("Failed to build credential: %v", err)
 	}
@@ -76,14 +86,13 @@ func main() {
 
 	// Step 6: Verify credential
 	fmt.Println("Verifying credential...")
-	verifyResult, err := auth.Verify(
+	verifyResult, err := verifier.Verify(
 		ctx,
 		[]byte(result.Token),
-		auth.WithVerifyProof(),
-		auth.WithCheckExpiration(),
-		auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
-		auth.WithVerificationMethodKey("key-1"),
-		auth.WithVerifyPermissions(),
+		verifier.WithVerifyProof(),
+		verifier.WithCheckExpiration(),
+		verifier.WithResolver(staticResolver),
+		verifier.WithVerifyPermissions(),
 	)
 	if err != nil {
 		log.Fatalf("Credential verification failed: %v", err)

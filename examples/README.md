@@ -31,6 +31,15 @@ Shows how to create and validate policies with different configurations.
 go run examples/create_policy/main.go
 ```
 
+### 4. Verify Presentation
+
+Shows end-to-end presentation flow: issue multiple VCs, create VP-JWT from them, then verify VP and parse/verify each embedded VC independently.
+
+**Run:**
+```bash
+go run examples/verify_presentation/main.go
+```
+
 ## Quick Start
 
 ### Building a Credential
@@ -40,7 +49,8 @@ import (
     "context"
     "time"
     "github.com/ethereum/go-ethereum/crypto"
-    "github.com/pilacorp/go-auth-sdk/auth"
+    "github.com/pilacorp/go-auth-sdk/auth/builder"
+    "github.com/pilacorp/go-auth-sdk/auth/model"
     "github.com/pilacorp/go-auth-sdk/auth/policy"
     "github.com/pilacorp/go-auth-sdk/signer"
     "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
@@ -75,22 +85,22 @@ credentialStatus := []vc.Status{
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 // Create AuthBuilder
-builder := auth.NewAuthBuilder(
-    auth.WithBuilderSchemaID("https://example.com/schema/v1"),
-    auth.WithSigner(ecdsaSigner),
+builder := builder.NewAuthBuilder(
+    builder.WithBuilderSchemaID("https://example.com/schema/v1"),
+    builder.WithSigner(ecdsaSigner),
 )
 
 // Build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, err := builder.Build(context.Background(), auth.AuthData{
+result, err := builder.Build(context.Background(), model.AuthData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
     ValidFrom:        &validFrom,
     ValidUntil:       &validUntil,
     CredentialStatus: credentialStatus,
-}, auth.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+}, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 
 if err != nil {
     // Handle error
@@ -100,18 +110,68 @@ if err != nil {
 ### Verifying a Credential
 
 ```go
-import "github.com/pilacorp/go-auth-sdk/auth"
+import "github.com/pilacorp/go-auth-sdk/auth/verifier"
 
-result, err := auth.Verify(
+result, err := verifier.Verify(
     context.Background(),
     credentialBytes,
-    auth.WithVerifyProof(),
-    auth.WithCheckExpiration(),
-    auth.WithDIDBaseURL("https://api.example.com/did"),
+    verifier.WithVerifyProof(),
+    verifier.WithCheckExpiration(),
+    verifier.WithDIDBaseURL("https://api.example.com/did"),
 )
 if err != nil {
     // Handle error
 }
 
 // Use result.IssuerDID, result.HolderDID, result.Permissions
+```
+
+### Building and Verifying a Presentation
+
+> Note:
+> - `WithVPResolver(...)` is optional.
+> - Custom resolver-based VP proof verification is not supported yet in the current version.
+> - For now, use `WithVPVerifyProof()` with DID base URL options for VP proof verification.
+
+```go
+// Build VP-JWT from one or many VC-JWT tokens
+vpBuilder := builder.NewVPBuilder(builder.WithVPSigner(ecdsa.NewPrivSigner(nil)))
+
+vpResp, err := vpBuilder.Build(
+    context.Background(),
+    model.VPData{
+        HolderDID: "did:example:holder",
+        VCTokens:  []string{vcToken1, vcToken2},
+    },
+    builder.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)),
+)
+if err != nil {
+    // Handle error
+}
+
+// Verify VP-JWT (only VP-level verification, does NOT auto-verify embedded VCs)
+vpResult, err := verifier.VerifyPresentation(
+    context.Background(),
+    []byte(vpResp.Token),
+    verifier.WithVPVerifyProof(),
+    verifier.WithVPCheckExpiration(),
+    verifier.WithVPDIDBaseURL("https://api.example.com/did"),
+)
+if err != nil {
+    // Handle error
+}
+
+// Verify each embedded VC independently based on your business logic
+for i, vc := range vpResult.VCs {
+    vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+        verifier.WithVerifyProof(),
+        verifier.WithCheckExpiration(),
+        verifier.WithVerifyPermissions(),
+        verifier.WithDIDBaseURL("https://api.example.com/did"),
+    )
+    if err != nil {
+        // Handle error per VC
+    }
+    _ = vcResult // Use as needed: IssuerDID, HolderDID, Permissions
+}
 ```

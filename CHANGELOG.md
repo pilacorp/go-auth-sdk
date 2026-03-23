@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Released]
 
+## [v1.1.0]
+
+### Added
+- Dedicated `auth/builder`, `auth/verifier`, and `auth/model` packages for the current VC/VP flow
+- VP verifier support for DID base URL verification and custom resolver injection via `WithVPResolver(...)`
+- Builder and verifier package tests covering the refactored VC/VP flows
+
+### Changed
+- Examples and integration tests now follow the package-split flow:
+  - build via `auth/builder`
+  - verify via `auth/verifier`
+  - shared DTOs via `auth/model`
+- `VerifyPresentation` examples and docs now use `VPVerifyResult.VCs`
+- `examples/verify_credential` now runs self-contained with a static resolver instead of an external DID resolver
+
+### Updated
+- Documentation in `README.md`, `AGENT.md`, and `examples/README.md` for the `v1.1.0` package structure
+
 ## [v1.0.6]
 
 ### Fixed
