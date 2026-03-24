@@ -18,12 +18,7 @@ go-auth-sdk/
 │   ├── verifier/          # Current VC/VP verifier package
 │   ├── model/             # Current shared data types
 │   ├── policy/            # Policy/permission types
-│   ├── status_builder.go  # StatusBuilder interface for revocation
-│   ├── auth.go            # Legacy compatibility API
-│   ├── verifier.go        # Legacy compatibility API
-│   ├── vp_builder.go      # Legacy compatibility API
-│   ├── vp_verifier.go     # Legacy compatibility API
-│   └── model.go           # Legacy compatibility types
+│   └── status/            # Status builder and status registration APIs
 ├── signer/                 # Signer interface + implementations
 │   ├── signer.go          # Signer interface
 │   ├── ecdsa/             # ECDSA local signer
@@ -39,7 +34,8 @@ go-auth-sdk/
 import (
     "context"
     "time"
-    "github.com/pilacorp/go-auth-sdk/auth"
+    "github.com/pilacorp/go-auth-sdk/auth/builder"
+    "github.com/pilacorp/go-auth-sdk/auth/model"
     "github.com/pilacorp/go-auth-sdk/auth/policy"
     "github.com/pilacorp/go-auth-sdk/signer"
     "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
@@ -72,7 +68,7 @@ credentialStatus := []vc.Status{
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 // 4. Create builder with schema ID and signer
-builder := builder.NewAuthBuilder(
+builder := builder.NewVCBuilder(
     builder.WithBuilderSchemaID("https://example.com/schema/v1"),
     builder.WithSigner(ecdsaSigner),
 )
@@ -80,7 +76,7 @@ builder := builder.NewAuthBuilder(
 // 5. Build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, err := builder.Build(ctx, model.AuthData{
+result, err := builder.Build(ctx, model.VCData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
@@ -179,7 +175,7 @@ for i, vc := range vpResult.VCs {
 ### Pattern 5: Custom Status Builder
 
 ```go
-import "github.com/pilacorp/go-auth-sdk/auth"
+import "github.com/pilacorp/go-auth-sdk/auth/status"
 import "github.com/pilacorp/go-credential-sdk/credential/vc"
 
 // Implement StatusBuilder interface for custom status creation
@@ -188,7 +184,7 @@ type MyStatusBuilder struct {
     AuthToken string
 }
 
-var _ auth.StatusBuilder = (*MyStatusBuilder)(nil)
+var _ status.StatusBuilder = (*MyStatusBuilder)(nil)
 
 func (b *MyStatusBuilder) CreateStatus(ctx context.Context, issuerDID string) ([]vc.Status, error) {
     // Custom logic here
@@ -229,12 +225,12 @@ import "github.com/pilacorp/go-auth-sdk/signer/vault"
 
 vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
 
-builder := builder.NewAuthBuilder(
+builder := builder.NewVCBuilder(
     builder.WithBuilderSchemaID("https://example.com/schema/v1"),
     builder.WithSigner(vaultSigner),
 )
 
-result, err := builder.Build(ctx, model.AuthData{
+result, err := builder.Build(ctx, model.VCData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
@@ -248,8 +244,8 @@ result, err := builder.Build(ctx, model.AuthData{
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `issuer must be a non-empty string` | IssuerDID is empty | Provide valid IssuerDID in AuthData |
-| `holder DID is required` | HolderDID is empty | Provide valid HolderDID in AuthData |
+| `issuer must be a non-empty string` | IssuerDID is empty | Provide valid IssuerDID in VCData |
+| `holder DID is required` | HolderDID is empty | Provide valid HolderDID in VCData |
 | `credential status is required` | CredentialStatus is empty | Provide status from StatusBuilder |
 | `schema ID is required` | SchemaID not set | Use WithBuilderSchemaID() |
 | `signer is required` | No signer configured | Use WithSigner() |
@@ -377,7 +373,7 @@ result, err := builder.Build(ctx, data, builder.WithSignerOptions(signer.WithSig
 
 ## Common Integration Points
 
-1. **Status Service** - Implement `StatusBuilder` interface for custom revocation or use `auth.NewStatusBuilder()` with optional `StatusBuilderOption` (e.g. `auth.WithStatusBuilderHTTPClient(customClient)`)
+1. **Status Service** - Implement `status.StatusBuilder` interface for custom revocation or use `status.NewStatusBuilder()` with optional `StatusBuilderOption` (e.g. `status.WithStatusBuilderHTTPClient(customClient)`)
 2. **DID Resolution** - Use `WithResolver()` for custom DID document resolution
 3. **HTTP Client** - Configurable via `WithStatusBuilderHTTPClient()`; defaults to 10s timeout when not overridden
 4. **Logging** - SDK does not log; handle in application layer

@@ -121,13 +121,13 @@ func main() {
 	}
 
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
-	authBuilder := builder.NewAuthBuilder(
+	authBuilder := builder.NewVCBuilder(
 		builder.WithBuilderSchemaID(schemaID),
 		builder.WithSigner(ecdsaSigner),
 	)
 
 	for i, p := range []*policy.Policy{&policy1, &policy2, &policy3} {
-		resp, err := authBuilder.Build(ctx, model.AuthData{
+		resp, err := authBuilder.Build(ctx, model.VCData{
 			IssuerDID:        issuerDID,
 			HolderDID:        holderDID,
 			Policy:           *p,
@@ -202,7 +202,7 @@ func main() {
 		}
 		fmt.Printf("✓ Parsed embedded VC[%d]\n", i)
 
-		vcVerifyResult, err := verifier.Verify(
+		vcVerifyResult, err := verifier.VCVerify(
 			ctx,
 			[]byte(token),
 			verifier.WithVerifyProof(),

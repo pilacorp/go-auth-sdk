@@ -67,7 +67,7 @@ func createTestCredentialJSONWithoutPermissions(issuerDID, holderDID string) []b
 }
 
 func TestVerify_EmptyCredential(t *testing.T) {
-	_, err := Verify(context.Background(), []byte{}, WithVerifyProof())
+	_, err := VCVerify(context.Background(), []byte{}, WithVerifyProof())
 	if err == nil {
 		t.Error("Verify() should return error for empty credential")
 	}
@@ -77,7 +77,7 @@ func TestVerify_EmptyCredential(t *testing.T) {
 }
 
 func TestVerify_InvalidJSON(t *testing.T) {
-	_, err := Verify(context.Background(), []byte("invalid json"), WithVerifyProof())
+	_, err := VCVerify(context.Background(), []byte("invalid json"), WithVerifyProof())
 	if err == nil {
 		t.Error("Verify() should return error for invalid JSON")
 	}
@@ -586,7 +586,7 @@ func TestVerify_WithSchemaID_Match(t *testing.T) {
 	)
 
 	// Verify with matching schema ID
-	result, err := Verify(ctx, credJSON, WithVerifySchemaID("https://example.com/schema"))
+	result, err := VCVerify(ctx, credJSON, WithVerifySchemaID("https://example.com/schema"))
 	if err != nil {
 		t.Fatalf("Verify() with matching schema ID error = %v, want nil", err)
 	}
@@ -614,7 +614,7 @@ func TestVerify_WithSchemaID_Mismatch(t *testing.T) {
 	)
 
 	// Verify with a different expected schema ID
-	_, err := Verify(ctx, credJSON, WithVerifySchemaID("https://other.com/schema"))
+	_, err := VCVerify(ctx, credJSON, WithVerifySchemaID("https://other.com/schema"))
 	if err == nil {
 		t.Fatalf("Verify() with mismatched schema ID error = nil, want non-nil")
 	}
@@ -719,7 +719,7 @@ func TestVerify_WithSchemaLoader(t *testing.T) {
 		return []byte(`{"type":"object"}`), nil
 	}
 
-	result, err := Verify(
+	result, err := VCVerify(
 		ctx,
 		credJSON,
 		WithSchemaValidation(),

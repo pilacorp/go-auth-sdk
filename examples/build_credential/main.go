@@ -85,12 +85,12 @@ func main() {
 	fmt.Println("✓ Created credential status")
 
 	// Step 7: Create AuthBuilder
-	authBuilder := builder.NewAuthBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
+	authBuilder := builder.NewVCBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
 	fmt.Println("✓ Created AuthBuilder")
 
 	// Step 8: Build the credential
 	holderDID := "did:example:holder"
-	result, err := authBuilder.Build(ctx, model.AuthData{
+	result, err := authBuilder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        holderDID,
 		Policy:           testPolicy,

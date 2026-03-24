@@ -84,8 +84,8 @@ credentialStatus := []vc.Status{
 // Create signer
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
-// Create AuthBuilder
-builder := builder.NewAuthBuilder(
+// Create VCBuilder
+builder := builder.NewVCBuilder(
     builder.WithBuilderSchemaID("https://example.com/schema/v1"),
     builder.WithSigner(ecdsaSigner),
 )
@@ -93,7 +93,7 @@ builder := builder.NewAuthBuilder(
 // Build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, err := builder.Build(context.Background(), model.AuthData{
+result, err := builder.Build(context.Background(), model.VCData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
