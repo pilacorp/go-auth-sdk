@@ -11,6 +11,7 @@ Go **Auth SDK** standardizes **Authentication + Authorization** using **Verifiab
 
 - **Policy-based permissions**: fine-grained authorization by action/resource/condition, moving away from "all-or-nothing" access.
 - **End-to-end VC-JWT flow**: build credential, sign, verify, extract permissions.
+- **End-to-end VP-JWT flow**: build presentation from one or many VC tokens, verify presentation, and parse/verify embedded VCs independently.
 - **Pluggable signer**: sign with local private key or Vault signer.
 - **Status integration (revocation)**: supports `credentialStatus` for credential revocation checking.
 
@@ -32,14 +33,16 @@ go get github.com/pilacorp/go-auth-sdk
   - credentialStatus (revocation)
 - **Sign credential**: uses `signer.Signer` (ECDSA or Vault) → produces VC-JWT.
 - **Holder**: calls API with header `Authorization: Bearer <vc-jwt>`.
-- **Service**: uses `auth.Verify` to:
+- **Service**: uses `verifier.Verify` to:
   - verify signature, expiration, schema, revocation (via options)
   - extract normalized issuer DID, holder DID, and permissions.
+- **Holder (presentation)**: uses `builder.NewVPBuilder(...).Build(...)` to create a VP-JWT from one or many VC-JWTs.
+- **Service (presentation)**: uses `verifier.VerifyPresentation` to verify VP, then parses and verifies each embedded VC independently based on business logic.
 
-#### 2. Input Structure for Building: `AuthData`
+#### 2. Input Structure for Building: `VCData`
 
 ```go
-type AuthData struct {
+type VCData struct {
 	ID               string        // optional: credential ID, SDK auto-generates UUID if empty
 	IssuerDID        string        // required: Issuer DID (the credential signer)
 	HolderDID        string        // required: Holder DID (credentialSubject.id)
@@ -91,7 +94,7 @@ p := policy.NewPolicy(
   - Data type: `[]vc.Status`.
   - Each time a new credential is built, the Issuer needs **at least one status entry** corresponding to the status service, then assigns it to this field.
   - Two main approaches:
-    - **Use SDK's `StatusBuilder` interface**: implement `StatusBuilder` interface or use the default `auth.NewStatusBuilder()` which calls the status registry API and returns `[]vc.Status`.
+    - **Use SDK's `StatusBuilder` interface**: implement `status.StatusBuilder` interface or use the default `status.NewStatusBuilder()` which calls the status registry API and returns `[]vc.Status`.
     - **Manually create `vc.Status` struct**: if you already have status information, simply initialize according to the template below and assign to `CredentialStatus`.
 
 **Creating Status with StatusBuilder:**
@@ -102,7 +105,7 @@ The SDK provides a `StatusBuilder` interface to help create credential status en
 
 ```go
 // Create a StatusBuilder using the default implementation
-statusBuilder := auth.NewStatusBuilder(
+statusBuilder := status.NewStatusBuilder(
 	"Bearer <issuer-access-token>",
 	"https://api.ndadid.vn/api/v1/credentials/status/register",
 )
@@ -113,7 +116,7 @@ if err != nil {
 	log.Fatalf("create status error: %v", err)
 }
 
-// Use statuses in AuthData.CredentialStatus
+// Use statuses in VCData.CredentialStatus
 ```
 
 **Method 2: Implement your own StatusBuilder**
@@ -127,8 +130,8 @@ type MyStatusBuilder struct {
 	AuthToken string
 }
 
-// Ensure MyStatusBuilder implements auth.StatusBuilder
-var _ auth.StatusBuilder = (*MyStatusBuilder)(nil)
+// Ensure MyStatusBuilder implements status.StatusBuilder
+var _ status.StatusBuilder = (*MyStatusBuilder)(nil)
 
 func (b *MyStatusBuilder) CreateStatus(ctx context.Context, issuerDID string) ([]vc.Status, error) {
 	// Your custom logic here (HTTP call, DB lookup, etc.)
@@ -151,7 +154,7 @@ statusBuilder := &MyStatusBuilder{
 }
 
 statuses, err := statusBuilder.CreateStatus(ctx, issuerDID)
-// Use statuses in AuthData.CredentialStatus
+// Use statuses in VCData.CredentialStatus
 ```
 
 **Method 3: Manually create vc.Status**
@@ -168,7 +171,7 @@ statuses := []vc.Status{
 		StatusListCredential: "https://.../credentials/status/0",
 	},
 }
-// Use statuses directly in AuthData.CredentialStatus
+// Use statuses directly in VCData.CredentialStatus
 ```
 
 #### 3. Signer (Signing Credentials)
@@ -191,7 +194,7 @@ import "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 // Private key must be passed via signer.WithPrivateKey() when calling Build()
-resp, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithPrivateKey(myPrivKeyBytes)))
+resp, err := builder.Build(ctx, data, builder.WithSignerOptions(signer.WithPrivateKey(myPrivKeyBytes)))
 ```
 
 **Method 2: Initialize with embedded key**
@@ -203,7 +206,7 @@ ecdsaSigner := ecdsa.NewPrivSigner(myPrivKeyBytes)
 // Can use the embedded key, or override with signer.WithPrivateKey()
 resp, err := builder.Build(ctx, data) // use key from struct
 // or
-resp, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithPrivateKey(anotherKey))) // override with different key
+resp, err := builder.Build(ctx, data, builder.WithSignerOptions(signer.WithPrivateKey(anotherKey))) // override with different key
 ```
 
 **Private key priority:**
@@ -219,8 +222,8 @@ Vault signer signs credentials through a Vault service (suitable for production,
 import "github.com/pilacorp/go-auth-sdk/signer/vault"
 
 vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
-// Signer address must be passed via auth.WithSignerOptions(...) when calling Build()
-resp, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
+// Signer address must be passed via builder.WithSignerOptions(...) when calling Build()
+resp, err := builder.Build(ctx, data, builder.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
 ```
 
 **Note:**
@@ -230,10 +233,22 @@ resp, err := builder.Build(ctx, data, auth.WithSignerOptions(signer.WithSignerAd
 #### 4. Build Credential (Create VC-JWT)
 
 ```go
+import (
+	"context"
+	"time"
+
+	"github.com/pilacorp/go-auth-sdk/auth/builder"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
+	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	"github.com/pilacorp/go-auth-sdk/auth/status"
+	"github.com/pilacorp/go-auth-sdk/signer"
+	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+)
+
 ctx := context.Background()
 
 // Create status using StatusBuilder (see section 2 above for details)
-statusBuilder := auth.NewStatusBuilder(
+statusBuilder := status.NewStatusBuilder(
 	"Bearer <issuer-access-token>",
 	"https://api.ndadid.vn/api/v1/credentials/status/register",
 )
@@ -254,23 +269,23 @@ p := policy.NewPolicy(policy.WithStatements(stmt))
 // Create signer
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
-// Create AuthBuilder with schema ID
-builder := auth.NewAuthBuilder(
-	auth.WithBuilderSchemaID("https://example.com/schema/v1"),
-	auth.WithSigner(ecdsaSigner),
+// Create VCBuilder with schema ID
+vcBuilder := builder.NewVCBuilder(
+	builder.WithBuilderSchemaID("https://example.com/schema/v1"),
+	builder.WithSigner(ecdsaSigner),
 )
 
 // Build credential
 validFrom := time.Now()
 validUntil := time.Now().Add(24 * time.Hour)
-result, err := builder.Build(ctx, auth.AuthData{
+result, err := vcBuilder.Build(ctx, model.VCData{
 	IssuerDID:        "did:nda:testnet:0xISSUER",
 	HolderDID:        "did:nda:testnet:0xHOLDER",
 	Policy:           p,
 	ValidFrom:        &validFrom,
 	ValidUntil:       &validUntil,
 	CredentialStatus: statuses,
-}, auth.WithSignerOptions(signer.WithPrivateKey(myPrivKeyBytes)))
+}, builder.WithSignerOptions(signer.WithPrivateKey(myPrivKeyBytes)))
 
 if err != nil {
 	log.Fatalf("build credential error: %v", err)
@@ -283,17 +298,19 @@ fmt.Println("VC-JWT:", result.Token)
 #### 5. Verify Credential (Check VC-JWT + Extract Permissions)
 
 ```go
+import "github.com/pilacorp/go-auth-sdk/auth/verifier"
+
 ctx := context.Background()
 
-result, err := auth.Verify(
+result, err := verifier.Verify(
 	ctx,
 	[]byte(credentialToken),
-	auth.WithVerifyProof(),                  // enable signature verification
-	auth.WithCheckExpiration(),              // check validity period
-	auth.WithSchemaValidation(),             // validate against schema
-	auth.WithCheckRevocation(),              // (optional) check status/revocation
-	auth.WithVerifySchemaID("https://example.com/schema/v1"), // expect correct schema ID
-	auth.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"), // URL to resolve DID document
+	verifier.WithVerifyProof(),                  // enable signature verification
+	verifier.WithCheckExpiration(),              // check validity period
+	verifier.WithSchemaValidation(),             // validate against schema
+	verifier.WithCheckRevocation(),              // (optional) check status/revocation
+	verifier.WithVerifySchemaID("https://example.com/schema/v1"), // expect correct schema ID
+	verifier.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"), // URL to resolve DID document
 )
 if err != nil {
 	log.Fatalf("verify credential error: %v", err)
@@ -304,9 +321,82 @@ fmt.Println("Holder DID:", result.HolderDID)
 fmt.Printf("Permissions: %+v\n", result.Permissions)
 ```
 
+#### 6. Build and Verify Presentation (VP-JWT)
+
+Use VP flow when a holder needs to present one or many VC-JWTs in a single signed presentation.
+
+**Build VP:**
+
+```go
+import (
+	"github.com/pilacorp/go-auth-sdk/auth/builder"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
+)
+
+vpSigner := ecdsa.NewPrivSigner(nil)
+vpBuilder := builder.NewVPBuilder(
+	builder.WithVPSigner(vpSigner),
+)
+
+vpResp, err := vpBuilder.Build(ctx, model.VPData{
+	HolderDID: "did:nda:testnet:0xHOLDER",
+	VCTokens:  []string{vcToken1, vcToken2},
+}, builder.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)))
+if err != nil {
+	log.Fatalf("build presentation error: %v", err)
+}
+
+fmt.Println("VP-JWT:", vpResp.Token)
+```
+
+**Verify VP:**
+
+> Note:
+> - `WithVPResolver(...)` is optional.
+> - Custom resolver-based VP proof verification is not supported yet in the current version.
+> - For now, use `WithVPVerifyProof()` with DID base URL options for VP proof verification.
+
+```go
+import "github.com/pilacorp/go-auth-sdk/auth/verifier"
+
+vpResult, err := verifier.VerifyPresentation(
+	ctx,
+	[]byte(vpResp.Token),
+	verifier.WithVPVerifyProof(),
+	verifier.WithVPCheckExpiration(),
+	verifier.WithVPDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+	verifier.WithVPVerificationMethodKey("key-1"),
+)
+if err != nil {
+	log.Fatalf("verify presentation error: %v", err)
+}
+
+fmt.Println("Holder DID:", vpResult.HolderDID)
+
+// Each embedded VC is returned as a raw token. Verify each VC independently
+// based on your business logic (e.g., different schema, policy requirements).
+for i, vc := range vpResult.VCs {
+	vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+		verifier.WithVerifyProof(),
+		verifier.WithCheckExpiration(),
+		verifier.WithVerifyPermissions(),
+		verifier.WithDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+		verifier.WithVerificationMethodKey("key-1"),
+	)
+	if err != nil {
+		log.Fatalf("verify embedded vc[%d] error: %v", i, err)
+	}
+	fmt.Printf("VC[%d] from %s:\n", i, vcResult.IssuerDID)
+	fmt.Printf("  Permissions: %+v\n", vcResult.Permissions)
+}
+```
+
 ### Repo Structure
 
-- `auth/`: Main API for building/verifying VC-JWT.
+- `auth/builder/`: Current VC/VP builder package.
+- `auth/verifier/`: Current VC/VP verifier package.
+- `auth/model/`: Shared request/response types.
 - `auth/policy/`: Policy/permission data types and validation functions.
+- `auth/`: Legacy compatibility layer kept during the package split transition.
 - `signer/`: `Signer` interface + implementations: ECDSA signer, Vault signer.
 - `examples/`: SDK usage examples.

@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pilacorp/go-auth-sdk/auth"
+	"github.com/pilacorp/go-auth-sdk/auth/builder"
+	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	"github.com/pilacorp/go-auth-sdk/auth/verifier"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
@@ -61,22 +63,22 @@ func TestBuildAndVerify(t *testing.T) {
 
 	// Create signer and builder
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
-	builder := auth.NewAuthBuilder(
-		auth.WithBuilderSchemaID("https://example.com/schema/v1"),
-		auth.WithSigner(ecdsaSigner),
+	authBuilder := builder.NewVCBuilder(
+		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
+		builder.WithSigner(ecdsaSigner),
 	)
 
 	validFrom := time.Now()
 	validUntil := time.Now().Add(5 * time.Minute)
 
-	buildResult, err := builder.Build(ctx, auth.AuthData{
+	buildResult, err := authBuilder.Build(ctx, model.VCData{
 		IssuerDID:        "did:e2e:issuer",
 		HolderDID:        "did:e2e:holder",
 		Policy:           p,
 		ValidFrom:        &validFrom,
 		ValidUntil:       &validUntil,
 		CredentialStatus: statuses,
-	}, auth.WithSignerOptions(signer.WithPrivateKey(privKeyBytes)))
+	}, builder.WithSignerOptions(signer.WithPrivateKey(privKeyBytes)))
 	if err != nil {
 		t.Fatalf("Build() error = %v", err)
 	}
@@ -87,11 +89,11 @@ func TestBuildAndVerify(t *testing.T) {
 	// For E2E we call Verify, but keep it simple and fully offline:
 	// - Use a mocked DID base URL to avoid real network calls.
 	// - Only enable expiration check; proof verification uses external DID resolution.
-	verifyResult, err := auth.Verify(
+	verifyResult, err := verifier.VCVerify(
 		ctx,
 		[]byte(buildResult.Token),
-		auth.WithDIDBaseURL(didServer.URL),
-		auth.WithCheckExpiration(),
+		verifier.WithDIDBaseURL(didServer.URL),
+		verifier.WithCheckExpiration(),
 	)
 	if err != nil {
 		t.Fatalf("Verify() error = %v", err)
