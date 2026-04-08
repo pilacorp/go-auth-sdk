@@ -97,6 +97,10 @@ result, err := builder.Build(context.Background(), model.VCData{
     IssuerDID:        "did:example:issuer",
     HolderDID:        "did:example:holder",
     Policy:           testPolicy,
+    CustomFields: map[string]any{
+        "tenantId": "tenant-001",
+        "role":     "admin",
+    },
     ValidFrom:        &validFrom,
     ValidUntil:       &validUntil,
     CredentialStatus: credentialStatus,
