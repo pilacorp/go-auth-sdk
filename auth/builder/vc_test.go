@@ -108,6 +108,84 @@ func TestAuthBuilder_Build(t *testing.T) {
 	t.Logf("Credential: %s", result.Token)
 }
 
+func TestAuthBuilder_Build_WithCustomFields(t *testing.T) {
+	ctx := context.Background()
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
+
+	testPolicy := policy.NewPolicy(
+		policy.WithStatements(
+			policy.NewStatement(
+				policy.EffectAllow,
+				[]policy.Action{policy.NewAction("Credential:Create")},
+				[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+				policy.NewCondition(),
+			),
+		),
+	)
+
+	builder := NewVCBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
+	result, err := builder.Build(ctx, model.VCData{
+		IssuerDID: "did:example:issuer",
+		HolderDID: "did:example:holder",
+		Policy:    testPolicy,
+		CustomFields: map[string]any{
+			"tenantId": "tenant-001",
+			"role":     "admin",
+		},
+		CredentialStatus: getDefaultTestStatus(),
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	if err != nil {
+		t.Fatalf("Build() with custom fields unexpected error: %v", err)
+	}
+
+	cred, err := vc.ParseCredential([]byte(result.Token))
+	if err != nil {
+		t.Fatalf("ParseCredential() unexpected error: %v", err)
+	}
+
+	contents, err := cred.GetContents()
+	if err != nil {
+		t.Fatalf("GetContents() unexpected error: %v", err)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(contents, &payload); err != nil {
+		t.Fatalf("Unmarshal credential contents unexpected error: %v", err)
+	}
+
+	var subject map[string]any
+	switch rawSubject := payload["credentialSubject"].(type) {
+	case map[string]any:
+		subject = rawSubject
+	case []any:
+		if len(rawSubject) == 0 {
+			t.Fatalf("credentialSubject array should be non-empty")
+		}
+		first, ok := rawSubject[0].(map[string]any)
+		if !ok {
+			t.Fatalf("credentialSubject[0] should be an object")
+		}
+		subject = first
+	default:
+		t.Fatalf("credentialSubject has unexpected type: %T", payload["credentialSubject"])
+	}
+
+	if got, ok := subject["tenantId"].(string); !ok || got != "tenant-001" {
+		t.Fatalf("tenantId = %v, want tenant-001", subject["tenantId"])
+	}
+	if got, ok := subject["role"].(string); !ok || got != "admin" {
+		t.Fatalf("role = %v, want admin", subject["role"])
+	}
+	if _, ok := subject["permissions"]; !ok {
+		t.Fatalf("permissions should be present in credentialSubject")
+	}
+}
+
 func TestAuthBuilder_WithSigner_NilPreservesDefault(t *testing.T) {
 	ctx := context.Background()
 	privateKey, err := crypto.GenerateKey()
