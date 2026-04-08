@@ -47,6 +47,7 @@ type VCData struct {
 	IssuerDID        string        // required: Issuer DID (the credential signer)
 	HolderDID        string        // required: Holder DID (credentialSubject.id)
 	Policy           policy.Policy // required: permissions list
+	CustomFields     map[string]any // optional: additional credentialSubject fields for custom business logic
 	ValidFrom        *time.Time    // optional: credential validity start time
 	ValidUntil       *time.Time    // optional: credential validity end time
 	CredentialStatus []vc.Status   // required: status information (revocation) for revocation checking
@@ -88,6 +89,11 @@ p := policy.NewPolicy(
 - Policies should be created using `policy.NewPolicy()` to ensure proper initialization.
 - If a Policy is created directly (e.g., from JSON unmarshaling), methods will automatically use the default specification when `Specification` is `nil`.
 - When using `WithSpecification()`, pass a pointer (`&spec`) to allow multiple policies to share the same specification instance (memory efficient).
+
+- **CustomFields** (optional):
+  - Add custom key-value pairs to `credentialSubject` for business-specific data (e.g., tenant, role, metadata).
+  - Type: `map[string]any`.
+  - Reserved key: `permissions` is managed by `Policy` and will be set by the SDK.
 
  - **CredentialStatus** (required):
   - Used to attach status information to the credential (especially for revocation checking).
@@ -282,6 +288,10 @@ result, err := vcBuilder.Build(ctx, model.VCData{
 	IssuerDID:        "did:nda:testnet:0xISSUER",
 	HolderDID:        "did:nda:testnet:0xHOLDER",
 	Policy:           p,
+	CustomFields: map[string]any{
+		"tenantId": "tenant-001",
+		"role":     "admin",
+	},
 	ValidFrom:        &validFrom,
 	ValidUntil:       &validUntil,
 	CredentialStatus: statuses,

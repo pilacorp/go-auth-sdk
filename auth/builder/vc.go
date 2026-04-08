@@ -84,9 +84,12 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 	if err := validateVCData(data, options); err != nil {
 		return nil, err
 	}
-	// Build credential subject with permissions
-	// vc.Subject has ID and CustomFields
-	customFields := make(map[string]any)
+	// Build credential subject with permissions and caller-provided custom fields.
+	customFields := make(map[string]any, len(data.CustomFields)+1)
+	for k, v := range data.CustomFields {
+		customFields[k] = v
+	}
+	// Keep permissions controlled by policy to avoid accidental override.
 	customFields["permissions"] = data.Policy.Permissions
 	subject := vc.Subject{
 		ID:           data.HolderDID,

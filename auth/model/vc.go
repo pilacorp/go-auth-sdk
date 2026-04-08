@@ -19,6 +19,7 @@ type VCData struct {
 	IssuerDID        string
 	HolderDID        string
 	Policy           policy.Policy
+	CustomFields     map[string]any
 	CredentialStatus []vc.Status
 	ValidFrom        *time.Time
 	ValidUntil       *time.Time

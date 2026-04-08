@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Released]
 
+## [v1.1.1]
+
+### Added
+- `model.VCData.CustomFields` to support custom business-specific fields in `credentialSubject`
+
+### Updated
+- Documentation (`README.md`, `examples/README.md`) with `CustomFields` usage and examples
+
 ## [v1.1.0]
 
 ### Added
