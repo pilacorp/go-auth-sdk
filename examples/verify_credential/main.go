@@ -14,7 +14,6 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/verifier"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
-	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -34,7 +33,7 @@ func main() {
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	issuerPubHex := hex.EncodeToString(crypto.FromECDSAPub(&privateKey.PublicKey))
-	staticResolver, err := verificationmethod.NewStaticResolver(issuerPubHex)
+	staticResolver, err := verifier.NewStaticResolver(issuerPubHex)
 	if err != nil {
 		log.Fatalf("Failed to create static resolver: %v", err)
 	}

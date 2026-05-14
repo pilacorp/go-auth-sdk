@@ -15,12 +15,19 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
 )
 
 // VPBuilderConfig is a configuration for the VPBuilder.
 type VPBuilderConfig struct {
+	verificationMethodKey string
+
+	// DID resolution — used when verificationMethodKey is empty.
+	didBaseURL string
+	resolver   verificationmethod.ResolverProvider
+
 	signer        signer.Signer
 	signerOptions []signer.SignOption
 }
@@ -46,6 +53,30 @@ func WithVPSigner(signer signer.Signer) VPBuilderConfigOption {
 func WithVPSignerOptions(opts ...signer.SignOption) VPBuilderConfigOption {
 	return func(b *VPBuilderConfig) {
 		b.signerOptions = opts
+	}
+}
+
+// WithVPBuilderVerificationMethodKey pins the VM fragment for the JWT `kid`.
+// If empty, the SDK resolves the latest active VM in authentication.
+func WithVPBuilderVerificationMethodKey(key string) VPBuilderConfigOption {
+	return func(b *VPBuilderConfig) {
+		b.verificationMethodKey = key
+	}
+}
+
+// WithVPBuilderBaseURL sets the DID resolver base URL. Used when no
+// explicit resolver is supplied. Ignored if WithVPBuilderResolver is set.
+func WithVPBuilderBaseURL(baseURL string) VPBuilderConfigOption {
+	return func(b *VPBuilderConfig) {
+		b.didBaseURL = baseURL
+	}
+}
+
+// WithVPBuilderResolver injects a DID document resolver. Takes precedence
+// over WithVPBuilderBaseURL.
+func WithVPBuilderResolver(resolver verificationmethod.ResolverProvider) VPBuilderConfigOption {
+	return func(b *VPBuilderConfig) {
+		b.resolver = resolver
 	}
 }
 
@@ -109,7 +140,11 @@ func (b *VPBuilder) Build(ctx context.Context, data model.VPData, opts ...VPBuil
 	}
 
 	// Create JWT presentation
-	presentation, err := vp.NewJWTPresentation(contents)
+	presentation, err := vp.NewJWTPresentation(contents,
+		vp.WithVerificationMethodKey(options.verificationMethodKey),
+		vp.WithBaseURL(options.didBaseURL),
+		vp.WithResolver(options.resolver),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT presentation: %w", err)
 	}
@@ -173,10 +208,12 @@ func validateVPData(data model.VPData, options *VPBuilderConfig) error {
 
 // mergeConfig merges the options into the builder config.
 func (b *VPBuilder) mergeConfig(opts ...VPBuilderConfigOption) *VPBuilderConfig {
-	// merge the options into the builder config
 	options := &VPBuilderConfig{
-		signer:        b.config.signer,
-		signerOptions: make([]signer.SignOption, len(b.config.signerOptions)),
+		verificationMethodKey: b.config.verificationMethodKey,
+		didBaseURL:            b.config.didBaseURL,
+		resolver:              b.config.resolver,
+		signer:                b.config.signer,
+		signerOptions:         make([]signer.SignOption, len(b.config.signerOptions)),
 	}
 	copy(options.signerOptions, b.config.signerOptions)
 

@@ -2,10 +2,12 @@ package builder
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -521,6 +523,54 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 		t.Error("Build() should return non-empty token with Vault signer")
 	}
 	t.Logf("Credential with Vault signer: %s", result.Token)
+}
+
+func TestAuthBuilder_Build_WithVerificationMethodKey(t *testing.T) {
+	ctx := context.Background()
+
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
+
+	testPolicy := policy.NewPolicy(
+		policy.WithStatements(
+			policy.NewStatement(
+				policy.EffectAllow,
+				[]policy.Action{policy.NewAction("Credential:Create")},
+				[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+				policy.NewCondition(),
+			),
+		),
+	)
+
+	builder := NewVCBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
+	result, err := builder.Build(ctx, model.VCData{
+		IssuerDID:        "did:example:issuer",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		CredentialStatus: getDefaultTestStatus(),
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), WithVerificationMethodKey("key-2"))
+	if err != nil {
+		t.Fatalf("Build() unexpected error: %v", err)
+	}
+	if result == nil || result.Token == "" {
+		t.Fatalf("Build() returned empty token")
+	}
+	parts := strings.Split(result.Token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("Build() returned invalid JWT: %s", result.Token)
+	}
+	headerBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		t.Fatalf("Decode JWT header: %v", err)
+	}
+	if !strings.Contains(string(headerBytes), "\"kid\":\"did:example:issuer#key-2\"") {
+		t.Fatalf("Build() header missing expected kid, got header: %s", string(headerBytes))
+	}
 }
 
 func TestAuthBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {

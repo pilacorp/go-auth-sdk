@@ -8,12 +8,31 @@ import (
 	"time"
 
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 )
 
 type mockResolver struct{}
 
-func (m *mockResolver) GetPublicKey(_ string) (string, error) {
-	return "0x0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", nil
+// ResolveDocument returns a synthetic DID Document with a fixed pub key.
+func (m *mockResolver) ResolveDocument(_ context.Context, did string) (*verificationmethod.DIDDocument, error) {
+	const pubHex = "0x0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+	vmID := did + "#key-1"
+	return &verificationmethod.DIDDocument{
+		Context: []string{"https://www.w3.org/ns/did/v1"},
+		ID:      did,
+		VerificationMethod: []verificationmethod.VerificationMethodEntry{
+			{
+				ID:           vmID,
+				Type:         "EcdsaSecp256k1VerificationKey2019",
+				Controller:   did,
+				PublicKeyHex: pubHex,
+			},
+		},
+		Authentication:      []string{vmID},
+		AssertionMethod:     []string{vmID},
+		Controller:          did,
+		DIDDocumentMetadata: map[string]interface{}{},
+	}, nil
 }
 
 // Test helper to create a valid credential JSON with permissions
