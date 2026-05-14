@@ -17,7 +17,6 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	ecdsasigner "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
-	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
 )
@@ -50,7 +49,7 @@ func TestVerifyPresentation_WithVPResolver(t *testing.T) {
 
 	vpToken := createTestPresentationToken(t, ctx, issuerDID, holderDID, issuerKeyBytes, holderKeyBytes)
 
-	resolver, err := verificationmethod.NewStaticResolver(holderPublicKey)
+	resolver, err := NewStaticResolver(holderPublicKey)
 	if err != nil {
 		t.Fatalf("failed to create static resolver: %v", err)
 	}

@@ -16,13 +16,19 @@ import (
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
 // VCBuilderConfig is a configuration for the VCBuilder.
 type VCBuilderConfig struct {
 	// Credential configuration
-	schemaID string
+	schemaID              string
+	verificationMethodKey string
+
+	// DID resolution — used when verificationMethodKey is empty.
+	didBaseURL string
+	resolver   verificationmethod.ResolverProvider
 
 	// Signing configuration (could be separate)
 	signer        signer.Signer
@@ -41,6 +47,30 @@ type VCBuilderConfigOption func(*VCBuilderConfig)
 func WithBuilderSchemaID(schemaID string) VCBuilderConfigOption {
 	return func(b *VCBuilderConfig) {
 		b.schemaID = schemaID
+	}
+}
+
+// WithVerificationMethodKey pins the VM fragment used for the JWT `kid`.
+// If empty, the SDK resolves the latest active VM in assertionMethod.
+func WithVerificationMethodKey(key string) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
+		b.verificationMethodKey = key
+	}
+}
+
+// WithBuilderBaseURL sets the DID resolver base URL. Used when no
+// explicit resolver is supplied. Ignored if WithBuilderResolver is set.
+func WithBuilderBaseURL(baseURL string) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
+		b.didBaseURL = baseURL
+	}
+}
+
+// WithBuilderResolver injects a DID document resolver. Takes precedence
+// over WithBuilderBaseURL.
+func WithBuilderResolver(resolver verificationmethod.ResolverProvider) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
+		b.resolver = resolver
 	}
 }
 
@@ -129,7 +159,11 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 	}
 
 	// Create JWT credential
-	vcCredential, err := vc.NewJWTCredential(vcContents)
+	vcCredential, err := vc.NewJWTCredential(vcContents,
+		vc.WithVerificationMethodKey(options.verificationMethodKey),
+		vc.WithBaseURL(options.didBaseURL),
+		vc.WithResolver(options.resolver),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT credential: %w", err)
 	}
@@ -207,9 +241,12 @@ func validateVCData(data model.VCData, options *VCBuilderConfig) error {
 func (b *VCBuilder) mergeConfig(opts ...VCBuilderConfigOption) *VCBuilderConfig {
 	// merge the options into the builder config
 	options := &VCBuilderConfig{
-		schemaID:      b.config.schemaID,
-		signer:        b.config.signer,
-		signerOptions: make([]signer.SignOption, len(b.config.signerOptions)),
+		schemaID:              b.config.schemaID,
+		verificationMethodKey: b.config.verificationMethodKey,
+		didBaseURL:            b.config.didBaseURL,
+		resolver:              b.config.resolver,
+		signer:                b.config.signer,
+		signerOptions:         make([]signer.SignOption, len(b.config.signerOptions)),
 	}
 	copy(options.signerOptions, b.config.signerOptions)
 
