@@ -188,6 +188,90 @@ func TestAuthBuilder_Build_WithCustomFields(t *testing.T) {
 	}
 }
 
+func TestAuthBuilder_Build_RequirePresentation(t *testing.T) {
+	ctx := context.Background()
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
+
+	testPolicy := policy.NewPolicy(
+		policy.WithStatements(
+			policy.NewStatement(
+				policy.EffectAllow,
+				[]policy.Action{policy.NewAction("Credential:Create")},
+				[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+				policy.NewCondition(),
+			),
+		),
+	)
+
+	tests := []struct {
+		name                string
+		requirePresentation bool
+		wantTypes           []string
+	}{
+		{
+			name:                "default omits presentation-required type",
+			requirePresentation: false,
+			wantTypes:           []string{model.CredentialTypeVerifiable, model.CredentialTypeAuthorization},
+		},
+		{
+			name:                "opt-in appends presentation-required type",
+			requirePresentation: true,
+			wantTypes: []string{
+				model.CredentialTypeVerifiable,
+				model.CredentialTypeAuthorization,
+				model.CredentialTypePresentationRequired,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewVCBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
+			result, err := b.Build(ctx, model.VCData{
+				IssuerDID:           "did:example:issuer",
+				HolderDID:           "did:example:holder",
+				Policy:              testPolicy,
+				CredentialStatus:    getDefaultTestStatus(),
+				RequirePresentation: tt.requirePresentation,
+			}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), WithVerificationMethodKey("key-1"))
+			if err != nil {
+				t.Fatalf("Build() unexpected error: %v", err)
+			}
+
+			cred, err := vc.ParseCredential([]byte(result.Token))
+			if err != nil {
+				t.Fatalf("ParseCredential() unexpected error: %v", err)
+			}
+
+			contents, err := cred.GetContents()
+			if err != nil {
+				t.Fatalf("GetContents() unexpected error: %v", err)
+			}
+
+			var payload struct {
+				Type []string `json:"type"`
+			}
+			if err := json.Unmarshal(contents, &payload); err != nil {
+				t.Fatalf("Unmarshal credential contents unexpected error: %v", err)
+			}
+
+			if len(payload.Type) != len(tt.wantTypes) {
+				t.Fatalf("type = %v, want %v", payload.Type, tt.wantTypes)
+			}
+			for i, want := range tt.wantTypes {
+				if payload.Type[i] != want {
+					t.Fatalf("type = %v, want %v", payload.Type, tt.wantTypes)
+				}
+			}
+		})
+	}
+}
+
 func TestAuthBuilder_WithSigner_NilPreservesDefault(t *testing.T) {
 	ctx := context.Background()
 	privateKey, err := crypto.GenerateKey()

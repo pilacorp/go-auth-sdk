@@ -132,6 +132,13 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 		data.ID = uuid.NewString()
 	}
 
+	// Types are controlled by the SDK; callers may only opt into the
+	// presentation-required marker, not supply arbitrary types.
+	types := []string{model.CredentialTypeVerifiable, model.CredentialTypeAuthorization}
+	if data.RequirePresentation {
+		types = append(types, model.CredentialTypePresentationRequired)
+	}
+
 	vcContents := vc.CredentialContents{
 		Context: []any{
 			"https://www.w3.org/ns/credentials/v2",
@@ -145,7 +152,7 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 			},
 		},
 		Issuer:           data.IssuerDID,
-		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
+		Types:            types,
 		Subject:          subjects,
 		CredentialStatus: data.CredentialStatus,
 	}

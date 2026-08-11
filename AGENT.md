@@ -88,6 +88,8 @@ result, err := builder.Build(ctx, model.VCData{
 // result.Token contains the VC-JWT
 ```
 
+**Credential types:** the builder always emits `["VerifiableCredential", "AuthorizationCredential"]`. Callers cannot pass arbitrary types; the only opt-in is `model.VCData.RequirePresentation` (optional, default `false`), which appends `"PresentationRequiredCredential"` to mark a credential that must be consumed inside a VP rather than standalone. Type values are available as `model.CredentialTypeVerifiable`, `model.CredentialTypeAuthorization`, `model.CredentialTypePresentationRequired`.
+
 ### Pattern 2: Verify a Credential (Service)
 
 ```go

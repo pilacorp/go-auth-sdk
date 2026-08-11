@@ -51,6 +51,7 @@ type VCData struct {
 	ValidFrom        *time.Time    // optional: credential validity start time
 	ValidUntil       *time.Time    // optional: credential validity end time
 	CredentialStatus []vc.Status   // required: status information (revocation) for revocation checking
+	RequirePresentation bool       // optional: mark the VC as usable only inside a VP (default false)
 }
 ```
 
@@ -94,6 +95,24 @@ p := policy.NewPolicy(
   - Add custom key-value pairs to `credentialSubject` for business-specific data (e.g., tenant, role, metadata).
   - Type: `map[string]any`.
   - Reserved key: `permissions` is managed by `Policy` and will be set by the SDK.
+
+- **RequirePresentation** (optional, default `false`):
+  - Marks the credential as usable **only** when presented inside a Verifiable Presentation, never on its own.
+  - When `true`, the SDK appends `"PresentationRequiredCredential"` to the credential `type` array; when `false` (or omitted) the type array is unchanged.
+  - Credential types are fully controlled by the SDK — callers can only opt in/out of this marker, they cannot supply arbitrary types.
+  - Type values are exported as constants: `model.CredentialTypeVerifiable`, `model.CredentialTypeAuthorization`, `model.CredentialTypePresentationRequired`.
+
+```go
+result, err := builder.Build(ctx, model.VCData{
+	IssuerDID:           "did:example:issuer",
+	HolderDID:           "did:example:holder",
+	Policy:              testPolicy,
+	CredentialStatus:    credentialStatus,
+	RequirePresentation: true, // type: ["VerifiableCredential", "AuthorizationCredential", "PresentationRequiredCredential"]
+}, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+```
+
+Verifiers that receive a bare VC-JWT can reject it when the type array contains `model.CredentialTypePresentationRequired`.
 
  - **CredentialStatus** (required):
   - Used to attach status information to the credential (especially for revocation checking).

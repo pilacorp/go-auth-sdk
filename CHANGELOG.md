@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Released]
 
+## [v1.1.2]
+
+### Added
+- `model.VCData.RequirePresentation` (optional, defaults to `false`): when `true`, the VC builder appends the `PresentationRequiredCredential` type to mark a credential that must only be consumed inside a Verifiable Presentation
+- Exported credential type constants `model.CredentialTypeVerifiable`, `model.CredentialTypeAuthorization`, and `model.CredentialTypePresentationRequired`
+
 ## [v1.1.1]
 
 ### Added
