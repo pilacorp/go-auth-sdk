@@ -13,16 +13,6 @@ import (
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
-const (
-	// CredentialTypeVerifiable is the base W3C credential type.
-	CredentialTypeVerifiable = "VerifiableCredential"
-	// CredentialTypeAuthorization marks a credential carrying authorization permissions.
-	CredentialTypeAuthorization = "AuthorizationCredential"
-	// CredentialTypePresentationRequired marks a credential that must only be consumed
-	// when presented inside a Verifiable Presentation, never on its own.
-	CredentialTypePresentationRequired = "PresentationRequiredCredential"
-)
-
 // VCData holds the credential-specific data.
 type VCData struct {
 	ID                  string

@@ -132,11 +132,13 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 		data.ID = uuid.NewString()
 	}
 
-	// Types are controlled by the SDK; callers may only opt into the
-	// presentation-required marker, not supply arbitrary types.
-	types := []string{model.CredentialTypeVerifiable, model.CredentialTypeAuthorization}
+	// Terms of use are controlled by the SDK; callers may only opt into the
+	// presentation-required policy, not supply arbitrary policies.
+	var termsOfUse []vc.TermsOfUse
 	if data.RequirePresentation {
-		types = append(types, model.CredentialTypePresentationRequired)
+		termsOfUse = append(termsOfUse, vc.TermsOfUse{
+			Type: "PresentationRequiredPolicy",
+		})
 	}
 
 	vcContents := vc.CredentialContents{
@@ -152,9 +154,10 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 			},
 		},
 		Issuer:           data.IssuerDID,
-		Types:            types,
+		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject:          subjects,
 		CredentialStatus: data.CredentialStatus,
+		TermsOfUse:       termsOfUse,
 	}
 
 	// Add validity period if provided

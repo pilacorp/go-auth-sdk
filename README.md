@@ -98,9 +98,9 @@ p := policy.NewPolicy(
 
 - **RequirePresentation** (optional, default `false`):
   - Marks the credential as usable **only** when presented inside a Verifiable Presentation, never on its own.
-  - When `true`, the SDK appends `"PresentationRequiredCredential"` to the credential `type` array; when `false` (or omitted) the type array is unchanged.
-  - Credential types are fully controlled by the SDK — callers can only opt in/out of this marker, they cannot supply arbitrary types.
-  - Type values are exported as constants: `model.CredentialTypeVerifiable`, `model.CredentialTypeAuthorization`, `model.CredentialTypePresentationRequired`.
+  - When `true`, the SDK attaches a `termsOfUse` entry of type `"PresentationRequiredPolicy"`; when `false` (or omitted) no `termsOfUse` is emitted and the credential is byte-for-byte what it was before.
+  - The credential `type` array is unaffected — it stays `["VerifiableCredential", "AuthorizationCredential"]` either way.
+  - `termsOfUse` is fully controlled by the SDK — callers can only opt in/out of this policy, they cannot supply arbitrary policies.
 
 ```go
 result, err := builder.Build(ctx, model.VCData{
@@ -108,11 +108,77 @@ result, err := builder.Build(ctx, model.VCData{
 	HolderDID:           "did:example:holder",
 	Policy:              testPolicy,
 	CredentialStatus:    credentialStatus,
-	RequirePresentation: true, // type: ["VerifiableCredential", "AuthorizationCredential", "PresentationRequiredCredential"]
+	RequirePresentation: true,
 }, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
 ```
 
-Verifiers that receive a bare VC-JWT can reject it when the type array contains `model.CredentialTypePresentationRequired`.
+Produces:
+
+```json
+"type": ["VerifiableCredential", "AuthorizationCredential"],
+"termsOfUse": [{ "type": "PresentationRequiredPolicy" }]
+```
+
+**The SDK issues this marker but does not enforce it.** `verifier.VCVerify` neither reads
+`termsOfUse` nor rejects a bare VC-JWT that carries the policy — enforcement is left to the
+relying party, because only the relying party knows whether the token arrived on its own or
+inside a presentation.
+
+To enforce it, read `termsOfUse` off the token yourself and reject a bare credential that
+carries the policy:
+
+```go
+const presentationRequiredPolicy = "PresentationRequiredPolicy"
+
+// requiresPresentation reports whether a VC-JWT may only be consumed inside a VP.
+func requiresPresentation(token string) (bool, error) {
+	cred, err := vc.ParseCredential([]byte(token))
+	if err != nil {
+		return false, err
+	}
+
+	contents, err := cred.GetContents()
+	if err != nil {
+		return false, err
+	}
+
+	var payload struct {
+		TermsOfUse []struct {
+			Type string `json:"type"`
+		} `json:"termsOfUse"`
+	}
+	if err := json.Unmarshal(contents, &payload); err != nil {
+		return false, err
+	}
+
+	for _, term := range payload.TermsOfUse {
+		if term.Type == presentationRequiredPolicy {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+```
+
+Apply it where the token enters your service — a credential presented through
+`verifier.VerifyPresentation` is fine, the same credential arriving in an
+`Authorization: Bearer` header is not:
+
+```go
+// Bare VC-JWT from a request header.
+required, err := requiresPresentation(bearerToken)
+if err != nil {
+	return err
+}
+if required {
+	return fmt.Errorf("credential must be presented inside a verifiable presentation")
+}
+
+result, err := verifier.VCVerify(ctx, []byte(bearerToken), verifier.WithVerifyProof())
+```
+
+`vc` here is `github.com/pilacorp/go-credential-sdk/credential/vc`.
 
  - **CredentialStatus** (required):
   - Used to attach status information to the credential (especially for revocation checking).

@@ -211,21 +211,17 @@ func TestAuthBuilder_Build_RequirePresentation(t *testing.T) {
 	tests := []struct {
 		name                string
 		requirePresentation bool
-		wantTypes           []string
+		wantTermsOfUse      []string
 	}{
 		{
-			name:                "default omits presentation-required type",
+			name:                "default omits termsOfUse",
 			requirePresentation: false,
-			wantTypes:           []string{model.CredentialTypeVerifiable, model.CredentialTypeAuthorization},
+			wantTermsOfUse:      nil,
 		},
 		{
-			name:                "opt-in appends presentation-required type",
+			name:                "opt-in attaches the presentation-required policy",
 			requirePresentation: true,
-			wantTypes: []string{
-				model.CredentialTypeVerifiable,
-				model.CredentialTypeAuthorization,
-				model.CredentialTypePresentationRequired,
-			},
+			wantTermsOfUse:      []string{"PresentationRequiredPolicy"},
 		},
 	}
 
@@ -254,18 +250,36 @@ func TestAuthBuilder_Build_RequirePresentation(t *testing.T) {
 			}
 
 			var payload struct {
-				Type []string `json:"type"`
+				Type       []string `json:"type"`
+				TermsOfUse []struct {
+					ID   string `json:"id"`
+					Type string `json:"type"`
+				} `json:"termsOfUse"`
 			}
 			if err := json.Unmarshal(contents, &payload); err != nil {
 				t.Fatalf("Unmarshal credential contents unexpected error: %v", err)
 			}
 
-			if len(payload.Type) != len(tt.wantTypes) {
-				t.Fatalf("type = %v, want %v", payload.Type, tt.wantTypes)
+			// The credential types must stay untouched either way.
+			wantTypes := []string{"VerifiableCredential", "AuthorizationCredential"}
+			if len(payload.Type) != len(wantTypes) {
+				t.Fatalf("type = %v, want %v", payload.Type, wantTypes)
 			}
-			for i, want := range tt.wantTypes {
+			for i, want := range wantTypes {
 				if payload.Type[i] != want {
-					t.Fatalf("type = %v, want %v", payload.Type, tt.wantTypes)
+					t.Fatalf("type = %v, want %v", payload.Type, wantTypes)
+				}
+			}
+
+			if len(payload.TermsOfUse) != len(tt.wantTermsOfUse) {
+				t.Fatalf("termsOfUse = %+v, want %v", payload.TermsOfUse, tt.wantTermsOfUse)
+			}
+			for i, want := range tt.wantTermsOfUse {
+				if payload.TermsOfUse[i].Type != want {
+					t.Fatalf("termsOfUse[%d].type = %q, want %q", i, payload.TermsOfUse[i].Type, want)
+				}
+				if payload.TermsOfUse[i].ID != "" {
+					t.Fatalf("termsOfUse[%d].id = %q, want empty", i, payload.TermsOfUse[i].ID)
 				}
 			}
 		})
