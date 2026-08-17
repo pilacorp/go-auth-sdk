@@ -132,6 +132,15 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 		data.ID = uuid.NewString()
 	}
 
+	// Terms of use are controlled by the SDK; callers may only opt into the
+	// presentation-required policy, not supply arbitrary policies.
+	var termsOfUse []vc.TermsOfUse
+	if data.RequirePresentation {
+		termsOfUse = append(termsOfUse, vc.TermsOfUse{
+			Type: "PresentationRequiredPolicy",
+		})
+	}
+
 	vcContents := vc.CredentialContents{
 		Context: []any{
 			"https://www.w3.org/ns/credentials/v2",
@@ -148,6 +157,7 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject:          subjects,
 		CredentialStatus: data.CredentialStatus,
+		TermsOfUse:       termsOfUse,
 	}
 
 	// Add validity period if provided

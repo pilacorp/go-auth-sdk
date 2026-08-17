@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Released]
 
+## [v1.2.0]
+
+### Added
+- `model.VCData.RequirePresentation` (optional, defaults to `false`): when `true`, the VC builder attaches a `termsOfUse` entry of type `PresentationRequiredPolicy` to mark a credential that must only be consumed inside a Verifiable Presentation. The credential `type` array is left untouched
+- `verifier.RequiresPresentation(token)` and `verifier.PresentationRequiredPolicy`: reads the `termsOfUse` marker off a VC-JWT so relying parties do not each reimplement the check. The SDK still does not enforce the policy — `VCVerify` cannot know whether a token arrived on its own or inside a presentation
+- `status.StatusBuilder` now rejects a status provider response whose entry has no `type`, instead of deferring the failure to credential build time where the error no longer points at the response that caused it
+
+### Changed
+- Bumped `github.com/pilacorp/go-credential-sdk` from `v1.6.0` to `v1.9.1`, which adds `vc.TermsOfUse`. Note that `v1.9.1` also makes `type` required on `credentialStatus`: a `vc.Status` with an empty `Type` now fails the credential build instead of being silently skipped
+
 ## [v1.1.1]
 
 ### Added

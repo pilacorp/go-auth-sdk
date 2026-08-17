@@ -51,6 +51,7 @@ type VCData struct {
 	ValidFrom        *time.Time    // optional: credential validity start time
 	ValidUntil       *time.Time    // optional: credential validity end time
 	CredentialStatus []vc.Status   // required: status information (revocation) for revocation checking
+	RequirePresentation bool       // optional: mark the VC as usable only inside a VP (default false)
 }
 ```
 
@@ -94,6 +95,55 @@ p := policy.NewPolicy(
   - Add custom key-value pairs to `credentialSubject` for business-specific data (e.g., tenant, role, metadata).
   - Type: `map[string]any`.
   - Reserved key: `permissions` is managed by `Policy` and will be set by the SDK.
+
+- **RequirePresentation** (optional, default `false`):
+  - Marks the credential as usable **only** when presented inside a Verifiable Presentation, never on its own.
+  - When `true`, the SDK attaches a `termsOfUse` entry of type `"PresentationRequiredPolicy"`; when `false` (or omitted) no `termsOfUse` is emitted and the credential is byte-for-byte what it was before.
+  - The credential `type` array is unaffected — it stays `["VerifiableCredential", "AuthorizationCredential"]` either way.
+  - `termsOfUse` is fully controlled by the SDK — callers can only opt in/out of this policy, they cannot supply arbitrary policies.
+
+```go
+result, err := builder.Build(ctx, model.VCData{
+	IssuerDID:           "did:example:issuer",
+	HolderDID:           "did:example:holder",
+	Policy:              testPolicy,
+	CredentialStatus:    credentialStatus,
+	RequirePresentation: true,
+}, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+```
+
+Produces:
+
+```json
+"type": ["VerifiableCredential", "AuthorizationCredential"],
+"termsOfUse": [{ "type": "PresentationRequiredPolicy" }]
+```
+
+**The SDK issues this marker but does not enforce it.** `verifier.VCVerify` neither reads
+`termsOfUse` nor rejects a bare VC-JWT that carries the policy — enforcement is left to the
+relying party, because only the relying party knows whether the token arrived on its own or
+inside a presentation.
+
+To enforce it, call `verifier.RequiresPresentation` where a bare token enters your service —
+a credential obtained through `verifier.VerifyPresentation` has already satisfied the
+condition, the same credential arriving in an `Authorization: Bearer` header has not:
+
+```go
+// Bare VC-JWT from a request header.
+required, err := verifier.RequiresPresentation(bearerToken)
+if err != nil {
+	return err
+}
+if required {
+	return fmt.Errorf("credential must be presented inside a verifiable presentation")
+}
+
+result, err := verifier.VCVerify(ctx, []byte(bearerToken), verifier.WithVerifyProof())
+```
+
+`RequiresPresentation` only reads what the token claims — it does not verify anything, so
+pair it with `VCVerify`. The policy type is exported as
+`verifier.PresentationRequiredPolicy` for callers that need to match on it directly.
 
  - **CredentialStatus** (required):
   - Used to attach status information to the credential (especially for revocation checking).

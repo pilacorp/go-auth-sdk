@@ -15,14 +15,15 @@ import (
 
 // VCData holds the credential-specific data.
 type VCData struct {
-	ID               string
-	IssuerDID        string
-	HolderDID        string
-	Policy           policy.Policy
-	CustomFields     map[string]any
-	CredentialStatus []vc.Status
-	ValidFrom        *time.Time
-	ValidUntil       *time.Time
+	ID                  string
+	IssuerDID           string
+	HolderDID           string
+	Policy              policy.Policy
+	CustomFields        map[string]any
+	CredentialStatus    []vc.Status
+	ValidFrom           *time.Time
+	ValidUntil          *time.Time
+	RequirePresentation bool
 }
 
 // VCResponse represents the result of building a credential.
