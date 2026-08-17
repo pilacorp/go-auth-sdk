@@ -88,7 +88,7 @@ result, err := builder.Build(ctx, model.VCData{
 // result.Token contains the VC-JWT
 ```
 
-**Credential types and terms of use:** the builder always emits `["VerifiableCredential", "AuthorizationCredential"]` and callers cannot pass arbitrary types. The only opt-in is `model.VCData.RequirePresentation` (optional, default `false`), which attaches `"termsOfUse": [{"type": "PresentationRequiredPolicy"}]` to mark a credential that must be consumed inside a VP rather than standalone; it does not touch the `type` array. The SDK only issues this marker — `verifier.VCVerify` does not read `termsOfUse` and does not reject a bare VC-JWT carrying it. Relying parties enforce it themselves; see the `RequirePresentation` section in `README.md` for the check.
+**Credential types and terms of use:** the builder always emits `["VerifiableCredential", "AuthorizationCredential"]` and callers cannot pass arbitrary types. The only opt-in is `model.VCData.RequirePresentation` (optional, default `false`), which attaches `"termsOfUse": [{"type": "PresentationRequiredPolicy"}]` to mark a credential that must be consumed inside a VP rather than standalone; it does not touch the `type` array. The SDK only issues this marker — `verifier.VCVerify` does not read `termsOfUse` and does not reject a bare VC-JWT carrying it. Relying parties enforce it themselves with `verifier.RequiresPresentation(token)`, which reports whether a bare VC-JWT carries the policy; the type is exported as `verifier.PresentationRequiredPolicy`.
 
 ### Pattern 2: Verify a Credential (Service)
 

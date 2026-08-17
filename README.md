@@ -124,50 +124,13 @@ Produces:
 relying party, because only the relying party knows whether the token arrived on its own or
 inside a presentation.
 
-To enforce it, read `termsOfUse` off the token yourself and reject a bare credential that
-carries the policy:
-
-```go
-const presentationRequiredPolicy = "PresentationRequiredPolicy"
-
-// requiresPresentation reports whether a VC-JWT may only be consumed inside a VP.
-func requiresPresentation(token string) (bool, error) {
-	cred, err := vc.ParseCredential([]byte(token))
-	if err != nil {
-		return false, err
-	}
-
-	contents, err := cred.GetContents()
-	if err != nil {
-		return false, err
-	}
-
-	var payload struct {
-		TermsOfUse []struct {
-			Type string `json:"type"`
-		} `json:"termsOfUse"`
-	}
-	if err := json.Unmarshal(contents, &payload); err != nil {
-		return false, err
-	}
-
-	for _, term := range payload.TermsOfUse {
-		if term.Type == presentationRequiredPolicy {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-```
-
-Apply it where the token enters your service — a credential presented through
-`verifier.VerifyPresentation` is fine, the same credential arriving in an
-`Authorization: Bearer` header is not:
+To enforce it, call `verifier.RequiresPresentation` where a bare token enters your service —
+a credential obtained through `verifier.VerifyPresentation` has already satisfied the
+condition, the same credential arriving in an `Authorization: Bearer` header has not:
 
 ```go
 // Bare VC-JWT from a request header.
-required, err := requiresPresentation(bearerToken)
+required, err := verifier.RequiresPresentation(bearerToken)
 if err != nil {
 	return err
 }
@@ -178,7 +141,9 @@ if required {
 result, err := verifier.VCVerify(ctx, []byte(bearerToken), verifier.WithVerifyProof())
 ```
 
-`vc` here is `github.com/pilacorp/go-credential-sdk/credential/vc`.
+`RequiresPresentation` only reads what the token claims — it does not verify anything, so
+pair it with `VCVerify`. The policy type is exported as
+`verifier.PresentationRequiredPolicy` for callers that need to match on it directly.
 
  - **CredentialStatus** (required):
   - Used to attach status information to the credential (especially for revocation checking).

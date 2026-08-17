@@ -2,7 +2,6 @@ package verifier
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -13,42 +12,6 @@ import (
 	ecdsasigner "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
-
-const presentationRequiredPolicy = "PresentationRequiredPolicy"
-
-// requiresPresentation mirrors the relying-party check documented in README.md:
-// the SDK issues the termsOfUse marker but does not enforce it, so a service that
-// accepts bare VC-JWTs has to read it off the token itself.
-func requiresPresentation(t *testing.T, token string) bool {
-	t.Helper()
-
-	cred, err := vc.ParseCredential([]byte(token))
-	if err != nil {
-		t.Fatalf("ParseCredential() unexpected error: %v", err)
-	}
-
-	contents, err := cred.GetContents()
-	if err != nil {
-		t.Fatalf("GetContents() unexpected error: %v", err)
-	}
-
-	var payload struct {
-		TermsOfUse []struct {
-			Type string `json:"type"`
-		} `json:"termsOfUse"`
-	}
-	if err := json.Unmarshal(contents, &payload); err != nil {
-		t.Fatalf("Unmarshal credential contents unexpected error: %v", err)
-	}
-
-	for _, term := range payload.TermsOfUse {
-		if term.Type == presentationRequiredPolicy {
-			return true
-		}
-	}
-
-	return false
-}
 
 // buildTermsOfUseVC builds a signed VC-JWT, optionally carrying the
 // presentation-required policy. The verification method key is pinned so the
@@ -141,7 +104,11 @@ func TestVCVerify_DoesNotEnforcePresentationRequired(t *testing.T) {
 		t.Fatalf("VCVerify() rejected a bare presentation-required credential: %v", err)
 	}
 
-	if !requiresPresentation(t, token) {
+	required, err := RequiresPresentation(token)
+	if err != nil {
+		t.Fatalf("RequiresPresentation() unexpected error: %v", err)
+	}
+	if !required {
 		t.Fatal("the relying-party check failed to spot the presentation-required policy")
 	}
 }
@@ -153,7 +120,9 @@ func TestPresentationRequired_SurvivesPresentationRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	plainToken, _, _ := buildTermsOfUseVC(t, false)
-	if requiresPresentation(t, plainToken) {
+	if required, err := RequiresPresentation(plainToken); err != nil {
+		t.Fatalf("RequiresPresentation() unexpected error: %v", err)
+	} else if required {
 		t.Fatal("a credential built without RequirePresentation must not carry the policy")
 	}
 
@@ -185,11 +154,50 @@ func TestPresentationRequired_SurvivesPresentationRoundTrip(t *testing.T) {
 		t.Fatalf("VCs length = %d, want 1", len(vpVerifyResult.VCs))
 	}
 
-	if !requiresPresentation(t, vpVerifyResult.VCs[0].Token) {
+	if required, err := RequiresPresentation(vpVerifyResult.VCs[0].Token); err != nil {
+		t.Fatalf("RequiresPresentation() unexpected error: %v", err)
+	} else if !required {
 		t.Fatal("the policy was lost on the VC token extracted from the presentation")
 	}
 
 	if _, err := VCVerify(ctx, []byte(vpVerifyResult.VCs[0].Token)); err != nil {
 		t.Fatalf("VCVerify() on the embedded credential unexpected error: %v", err)
+	}
+}
+
+func TestRequiresPresentation(t *testing.T) {
+	requiredToken, _, _ := buildTermsOfUseVC(t, true)
+	plainToken, _, _ := buildTermsOfUseVC(t, false)
+
+	tests := []struct {
+		name    string
+		token   string
+		want    bool
+		wantErr bool
+	}{
+		{name: "credential carrying the policy", token: requiredToken, want: true},
+		{name: "credential without the policy", token: plainToken, want: false},
+		{name: "empty token", token: "", wantErr: true},
+		{name: "not a credential", token: "not-a-jwt", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := RequiresPresentation(tt.token)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("RequiresPresentation() error = nil, want an error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("RequiresPresentation() unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("RequiresPresentation() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
