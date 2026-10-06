@@ -19,8 +19,8 @@ github.com/holiman/uint256 v1.3.2 h1:a9EgMPSC1AAaj1SZL5zIQD3WbwTuHrMGOerLjGmM/TA
 github.com/holiman/uint256 v1.3.2/go.mod h1:EOMSn4q6Nyt9P6efbI3bueV4e1b3dGlUCXeiRV4ng7E=
 github.com/mr-tron/base58 v1.3.0 h1:K6Y13R2h+dku0wOqKtecgRnBUBPrZzLZy5aIj8lCcJI=
 github.com/mr-tron/base58 v1.3.0/go.mod h1:2BuubE67DCSWwVfx37JWNG8emOC0sHEU4/HpcYgCLX8=
-github.com/pilacorp/go-credential-sdk v1.9.1 h1:Fhgrgo+ZCgBh60yv+OzfKq3v5wkKvCYnZOGjJ+3wFvo=
-github.com/pilacorp/go-credential-sdk v1.9.1/go.mod h1:IS61MPpiV8NIeBzYmndHRNuQrIPMVb8MEK+n9tmp4Lg=
+github.com/pilacorp/go-credential-sdk v1.13.1 h1:93QhS+a3VhU4DqUxHLY3E9Lfo9J4GUiENnq1WeXxCC8=
+github.com/pilacorp/go-credential-sdk v1.13.1/go.mod h1:IS61MPpiV8NIeBzYmndHRNuQrIPMVb8MEK+n9tmp4Lg=
 github.com/piprate/json-gold v0.7.0 h1:bEMirgA5y8Z2loTQfxyIFfY+EflxH1CTP6r/KIlcJNw=
 github.com/piprate/json-gold v0.7.0/go.mod h1:RVhE35veDX19r5gfUAR+IYHkAUuPwJO8Ie/qVeFaIzw=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
