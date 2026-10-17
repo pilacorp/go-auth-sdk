@@ -117,14 +117,6 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 		return nil, fmt.Errorf("failed to parse presentation: %w", err)
 	}
 
-	// This is an optional step to verify the VP proof using a custom resolver, which can be enabled via options.
-	// But currently unused before we have to move the verifyVPProofWithResolver function to the credential SDK and make it available as a presentation option.
-	// if verifyOpts.isVerifyProof && verifyOpts.resolver != nil {
-	// 	if err := verifyVPProofWithResolver(presentation, verifyOpts.resolver); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
-
 	// Get presentation contents once and reuse across all checks
 	vpContents, err := parsedVP.GetContents()
 	if err != nil {
@@ -194,17 +186,12 @@ func buildVPOptions(opts *vpVerifyOptions) []vp.PresentationOpt {
 		vpOpts = append(vpOpts, vp.WithCheckExpiration())
 	}
 
+	if opts.resolver != nil {
+		vpOpts = append(vpOpts, vp.WithResolver(opts.resolver))
+	}
+
 	return vpOpts
 }
-
-// func verifyVPProofWithResolver(presentation []byte, resolver verificationmethod.ResolverProvider) error {
-// 	verifier := credentialjwt.NewJWTVerifierWithResolver(resolver)
-// 	if err := verifier.VerifyJWT(string(presentation)); err != nil {
-// 		return fmt.Errorf("failed to verify presentation: %w", err)
-// 	}
-
-// 	return nil
-// }
 
 // extractHolderDIDFromData extracts the holder DID from the unmarshaled VP data.
 func extractHolderDIDFromData(vpData model.PresentationData) (string, error) {

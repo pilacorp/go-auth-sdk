@@ -3,13 +3,20 @@
 // The package provides:
 //   - AuthBuilder: A builder for creating and signing VC-JWT credentials with embedded permissions
 //   - VPBuilder: A builder for creating and signing VP-JWT presentations with embedded VC tokens
-//   - Builder options: Configurable options for schema IDs, signer implementations, and signer options
+//   - Builder options: Configurable options for schema IDs, signer implementations, signer options,
+//     and DID resolution (resolver, DID base URL, verification method key)
+//
+// Building resolves the issuer's (VC) or holder's (VP) DID document to pick the
+// signing verification method, and the signature must verify against it. Without
+// a resolver or base URL option, resolution uses go-credential-sdk's default
+// (the production DID registry, or the URL passed to vc.Init / vp.Init).
 package builder
 
 import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/auth/model"
@@ -160,7 +167,9 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 		TermsOfUse:       termsOfUse,
 	}
 
-	// Add validity period if provided
+	// Default validFrom to now so the token always carries iat; the verifier
+	// rejects a token without iat once the signing VM has a revocation time.
+	vcContents.ValidFrom = time.Now()
 	if data.ValidFrom != nil {
 		vcContents.ValidFrom = *data.ValidFrom
 	}
@@ -169,11 +178,7 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 	}
 
 	// Create JWT credential
-	vcCredential, err := vc.NewJWTCredential(vcContents,
-		vc.WithVerificationMethodKey(options.verificationMethodKey),
-		vc.WithBaseURL(options.didBaseURL),
-		vc.WithResolver(options.resolver),
-	)
+	vcCredential, err := vc.NewJWTCredential(vcContents, options.credentialOptions()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT credential: %w", err)
 	}
@@ -216,6 +221,22 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 	return &model.VCResponse{
 		Token: token,
 	}, nil
+}
+
+// credentialOptions maps the DID resolution settings to SDK options. Unset
+// values are left out so the SDK keeps its own defaults (vc.Init base URL).
+func (c *VCBuilderConfig) credentialOptions() []vc.CredentialOpt {
+	var opts []vc.CredentialOpt
+	if c.verificationMethodKey != "" {
+		opts = append(opts, vc.WithVerificationMethodKey(c.verificationMethodKey))
+	}
+	if c.didBaseURL != "" {
+		opts = append(opts, vc.WithBaseURL(c.didBaseURL))
+	}
+	if c.resolver != nil {
+		opts = append(opts, vc.WithResolver(c.resolver))
+	}
+	return opts
 }
 
 // validateVCData validates that the required fields in model.VCData are present.

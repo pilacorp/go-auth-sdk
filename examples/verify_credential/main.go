@@ -67,7 +67,13 @@ func main() {
 	validFrom := time.Now()
 	validUntil := time.Now().Add(24 * time.Hour)
 
-	authBuilder := builder.NewVCBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
+	// The builder resolves the issuer DID to pick the signing key. Production
+	// code passes builder.WithBuilderBaseURL(<DID registry of the environment>).
+	authBuilder := builder.NewVCBuilder(
+		builder.WithBuilderSchemaID(schemaID),
+		builder.WithSigner(ecdsaSigner),
+		builder.WithBuilderResolver(staticResolver),
+	)
 	result, err := authBuilder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        "did:example:holder",

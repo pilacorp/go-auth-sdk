@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/auth/model"
@@ -80,6 +81,22 @@ func WithVPBuilderResolver(resolver verificationmethod.ResolverProvider) VPBuild
 	}
 }
 
+// presentationOptions maps the DID resolution settings to SDK options. Unset
+// values are left out so the SDK keeps its own defaults (vp.Init base URL).
+func (c *VPBuilderConfig) presentationOptions() []vp.PresentationOpt {
+	var opts []vp.PresentationOpt
+	if c.verificationMethodKey != "" {
+		opts = append(opts, vp.WithVerificationMethodKey(c.verificationMethodKey))
+	}
+	if c.didBaseURL != "" {
+		opts = append(opts, vp.WithBaseURL(c.didBaseURL))
+	}
+	if c.resolver != nil {
+		opts = append(opts, vp.WithResolver(c.resolver))
+	}
+	return opts
+}
+
 // NewVPBuilder creates a new VPBuilder with the given config options.
 func NewVPBuilder(opts ...VPBuilderConfigOption) *VPBuilder {
 	config := &VPBuilderConfig{}
@@ -131,7 +148,9 @@ func (b *VPBuilder) Build(ctx context.Context, data model.VPData, opts ...VPBuil
 		VerifiableCredentials: credentials,
 	}
 
-	// Set optional validity fields
+	// Default validFrom to now so the token always carries iat; the verifier
+	// rejects a token without iat once the signing VM has a revocation time.
+	contents.ValidFrom = time.Now()
 	if data.ValidFrom != nil {
 		contents.ValidFrom = *data.ValidFrom
 	}
@@ -140,11 +159,7 @@ func (b *VPBuilder) Build(ctx context.Context, data model.VPData, opts ...VPBuil
 	}
 
 	// Create JWT presentation
-	presentation, err := vp.NewJWTPresentation(contents,
-		vp.WithVerificationMethodKey(options.verificationMethodKey),
-		vp.WithBaseURL(options.didBaseURL),
-		vp.WithResolver(options.resolver),
-	)
+	presentation, err := vp.NewJWTPresentation(contents, options.presentationOptions()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT presentation: %w", err)
 	}

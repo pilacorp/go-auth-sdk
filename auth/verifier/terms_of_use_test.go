@@ -2,6 +2,7 @@ package verifier
 
 import (
 	"context"
+	"encoding/hex"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -38,9 +39,15 @@ func buildTermsOfUseVC(t *testing.T, requirePresentation bool) (token, issuerDID
 		),
 	)
 
+	issuerResolver, err := NewStaticResolver(hex.EncodeToString(crypto.FromECDSAPub(&privateKey.PublicKey)))
+	if err != nil {
+		t.Fatalf("Failed to create resolver: %v", err)
+	}
+
 	b := builder.NewVCBuilder(
 		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
 		builder.WithSigner(ecdsasigner.NewPrivSigner(nil)),
+		builder.WithBuilderResolver(issuerResolver),
 	)
 
 	result, err := b.Build(context.Background(), model.VCData{
@@ -133,7 +140,15 @@ func TestPresentationRequired_SurvivesPresentationRoundTrip(t *testing.T) {
 		t.Fatalf("Failed to generate holder key: %v", err)
 	}
 
-	vpBuilder := builder.NewVPBuilder(builder.WithVPSigner(ecdsasigner.NewPrivSigner(nil)))
+	holderResolver, err := NewStaticResolver(hex.EncodeToString(crypto.FromECDSAPub(&holderKey.PublicKey)))
+	if err != nil {
+		t.Fatalf("Failed to create resolver: %v", err)
+	}
+
+	vpBuilder := builder.NewVPBuilder(
+		builder.WithVPSigner(ecdsasigner.NewPrivSigner(nil)),
+		builder.WithVPBuilderResolver(holderResolver),
+	)
 	vpResult, err := vpBuilder.Build(ctx, model.VPData{
 		HolderDID: holderDID,
 		VCTokens:  []string{requiredToken},
