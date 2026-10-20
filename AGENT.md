@@ -67,10 +67,11 @@ credentialStatus := []vc.Status{
 // 3. Create signer (ECDSA or Vault)
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
-// 4. Create builder with schema ID and signer
+// 4. Create builder with schema ID, signer and the DID registry used to resolve the issuer
 builder := builder.NewVCBuilder(
     builder.WithBuilderSchemaID("https://example.com/schema/v1"),
     builder.WithSigner(ecdsaSigner),
+    builder.WithBuilderBaseURL("https://api.ndadid.vn/api/v1/did"),
 )
 
 // 5. Build credential
@@ -96,7 +97,7 @@ result, err := builder.Build(ctx, model.VCData{
 import "github.com/pilacorp/go-auth-sdk/auth/verifier"
 
 // Verify with multiple options
-result, err := verifier.Verify(
+result, err := verifier.VCVerify(
     ctx,
     []byte(credentialToken),
     verifier.WithVerifyProof(),                // verify signature
@@ -119,7 +120,8 @@ if err != nil {
 ```go
 import (
     "context"
-    "github.com/pilacorp/go-auth-sdk/auth"
+    "github.com/pilacorp/go-auth-sdk/auth/builder"
+    "github.com/pilacorp/go-auth-sdk/auth/model"
     "github.com/pilacorp/go-auth-sdk/signer"
     "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 )
@@ -127,6 +129,7 @@ import (
 vpSigner := ecdsa.NewPrivSigner(nil)
 vpBuilder := builder.NewVPBuilder(
     builder.WithVPSigner(vpSigner),
+    builder.WithVPBuilderBaseURL("https://api.ndadid.vn/api/v1/did"),
 )
 
 vpResp, err := vpBuilder.Build(context.Background(), model.VPData{
@@ -161,7 +164,7 @@ holderDID := vpResult.HolderDID
 
 // Each embedded VC is returned as a raw token. Verify each VC independently.
 for i, vc := range vpResult.VCs {
-    vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+    vcResult, err := verifier.VCVerify(ctx, []byte(vc.Token),
         verifier.WithVerifyProof(),
         verifier.WithCheckExpiration(),
         verifier.WithVerifyPermissions(),
@@ -327,6 +330,18 @@ vaultSigner := vault.NewVaultSigner("https://vault.example.com", "vault-token")
 result, err := builder.Build(ctx, data, builder.WithSignerOptions(signer.WithSignerAddress("0x1234...")))
 ```
 
+## Builder DID Resolution Options
+
+Building resolves the signer DID (issuer for VC, holder for VP); the signature must verify
+against the chosen VM. Without these options the SDK default (production registry, or
+`vc.Init` / `vp.Init`) is used. `ValidFrom` defaults to the build time.
+
+| VC builder | VP builder | Purpose |
+|------------|------------|---------|
+| `WithBuilderBaseURL(url)` | `WithVPBuilderBaseURL(url)` | DID registry endpoint |
+| `WithBuilderResolver(r)` | `WithVPBuilderResolver(r)` | Custom DID resolver (wins over base URL) |
+| `WithVerificationMethodKey(key)` | `WithVPBuilderVerificationMethodKey(key)` | Pin VM fragment; default is latest active VM for the purpose |
+
 ## Verify Options
 
 | Option | Purpose |
@@ -349,8 +364,9 @@ result, err := builder.Build(ctx, data, builder.WithSignerOptions(signer.WithSig
 | `WithVPCheckExpiration()` | Check VP validity period |
 | `WithVPDIDBaseURL(url)` | DID resolution endpoint for VP proof verification |
 | `WithVPVerificationMethodKey(key)` | Verification method key (default: `key-1`) |
+| `WithVPResolver(resolver)` | Custom DID resolver for VP proof verification |
 
-**Note:** `VerifyPresentation` parses the VP and extracts holder DID + raw VC tokens. It does NOT auto-verify embedded VCs. Callers should call `auth.Verify` for each VC token based on their business logic.
+**Note:** `VerifyPresentation` parses the VP and extracts holder DID + raw VC tokens. It does NOT auto-verify embedded VCs. Callers should call `verifier.VCVerify` for each VC token based on their business logic.
 
 ## Testing Notes
 

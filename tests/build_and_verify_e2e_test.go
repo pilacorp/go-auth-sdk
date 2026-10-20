@@ -2,8 +2,7 @@ package test
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/verifier"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -25,21 +25,17 @@ func TestBuildAndVerify(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Mock DID resolver base URL to avoid hitting real network services.
-	didServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// For this E2E test we don't enable proof verification against DID,
-		// so the exact payload is not important. We just return 200 OK.
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
-	}))
-	defer didServer.Close()
-
 	// Generate a private key
 	privKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatalf("failed to generate private key: %v", err)
 	}
 	privKeyBytes := crypto.FromECDSA(privKey)
+
+	// Offline DID resolution: the issuer DID publishes privKey's public key.
+	issuerDID := "did:e2e:issuer"
+	resolver := verificationmethod.NewStaticResolver(verificationmethod.NewDIDDocument(issuerDID,
+		verificationmethod.NewSecp256k1VM(issuerDID, "key-1", hex.EncodeToString(crypto.FromECDSAPub(&privKey.PublicKey)))))
 
 	// Create policy
 	stmt := policy.NewStatement(
@@ -66,6 +62,7 @@ func TestBuildAndVerify(t *testing.T) {
 	authBuilder := builder.NewVCBuilder(
 		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
 		builder.WithSigner(ecdsaSigner),
+		builder.WithBuilderResolver(resolver),
 	)
 
 	validFrom := time.Now()
@@ -86,13 +83,12 @@ func TestBuildAndVerify(t *testing.T) {
 		t.Fatalf("Build() returned empty token")
 	}
 
-	// For E2E we call Verify, but keep it simple and fully offline:
-	// - Use a mocked DID base URL to avoid real network calls.
-	// - Only enable expiration check; proof verification uses external DID resolution.
+	// Verify the signature for real, against the same offline resolver.
 	verifyResult, err := verifier.VCVerify(
 		ctx,
 		[]byte(buildResult.Token),
-		verifier.WithDIDBaseURL(didServer.URL),
+		verifier.WithResolver(resolver),
+		verifier.WithVerifyProof(),
 		verifier.WithCheckExpiration(),
 	)
 	if err != nil {

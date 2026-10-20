@@ -84,10 +84,13 @@ credentialStatus := []vc.Status{
 // Create signer
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
-// Create VCBuilder
+// Create VCBuilder. Building resolves the issuer DID to pick the signing key:
+// point it at your DID registry, or pass builder.WithBuilderResolver(...) for an
+// in-memory resolver as the runnable examples do.
 builder := builder.NewVCBuilder(
     builder.WithBuilderSchemaID("https://example.com/schema/v1"),
     builder.WithSigner(ecdsaSigner),
+    builder.WithBuilderBaseURL("https://api.example.com/did"),
 )
 
 // Build credential
@@ -116,7 +119,7 @@ if err != nil {
 ```go
 import "github.com/pilacorp/go-auth-sdk/auth/verifier"
 
-result, err := verifier.Verify(
+result, err := verifier.VCVerify(
     context.Background(),
     credentialBytes,
     verifier.WithVerifyProof(),
@@ -133,13 +136,15 @@ if err != nil {
 ### Building and Verifying a Presentation
 
 > Note:
-> - `WithVPResolver(...)` is optional.
-> - Custom resolver-based VP proof verification is not supported yet in the current version.
-> - For now, use `WithVPVerifyProof()` with DID base URL options for VP proof verification.
+> - Building a VP resolves the holder DID; its document must list the holder's VM under `authentication`.
+> - `WithVPResolver(...)` is optional. When set, it is used for VP proof verification instead of the DID base URL.
 
 ```go
 // Build VP-JWT from one or many VC-JWT tokens
-vpBuilder := builder.NewVPBuilder(builder.WithVPSigner(ecdsa.NewPrivSigner(nil)))
+vpBuilder := builder.NewVPBuilder(
+    builder.WithVPSigner(ecdsa.NewPrivSigner(nil)),
+    builder.WithVPBuilderBaseURL("https://api.example.com/did"),
+)
 
 vpResp, err := vpBuilder.Build(
     context.Background(),
@@ -167,7 +172,7 @@ if err != nil {
 
 // Verify each embedded VC independently based on your business logic
 for i, vc := range vpResult.VCs {
-    vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+    vcResult, err := verifier.VCVerify(ctx, []byte(vc.Token),
         verifier.WithVerifyProof(),
         verifier.WithCheckExpiration(),
         verifier.WithVerifyPermissions(),

@@ -17,6 +17,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	ecdsasigner "github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 	"github.com/pilacorp/go-credential-sdk/credential/vp"
 )
@@ -880,5 +881,64 @@ func TestExtractVCTokens_ObjectVC(t *testing.T) {
 	var vpData model.PresentationData
 	if err := json.Unmarshal(vpJSON, &vpData); err == nil {
 		t.Fatalf("json.Unmarshal() should return error for object VC when PresentationData expects []string")
+	}
+}
+
+// defaultDIDBaseURL is go-credential-sdk's built-in DID resolver URL; tests
+// reset vc.Init / vp.Init to it so no earlier test's DID server leaks in.
+const defaultDIDBaseURL = "https://api.ndadid.vn/api/v1/did"
+
+// WithVPResolver must be what verifies the VP proof: no DID server, no
+// vp.Init and no WithVPDIDBaseURL are configured here.
+func TestVerifyPresentation_UsesVPResolverWithoutBaseURL(t *testing.T) {
+	ctx := context.Background()
+	vp.Init(defaultDIDBaseURL)
+
+	issuerPriv, _ := crypto.GenerateKey()
+	holderPriv, _ := crypto.GenerateKey()
+	issuerDID, holderDID := "did:test:issuer", "did:test:holder"
+	resolver := verificationmethod.NewStaticResolver(
+		verificationmethod.NewDIDDocument(issuerDID, verificationmethod.NewSecp256k1VM(issuerDID, "key-1",
+			hex.EncodeToString(crypto.FromECDSAPub(&issuerPriv.PublicKey)))),
+		verificationmethod.NewDIDDocument(holderDID, verificationmethod.NewSecp256k1VM(holderDID, "key-1",
+			hex.EncodeToString(crypto.FromECDSAPub(&holderPriv.PublicKey)))),
+	)
+
+	vcResp, err := builder.NewVCBuilder(
+		builder.WithBuilderSchemaID("https://example.com/schema/v1"),
+		builder.WithSigner(ecdsasigner.NewPrivSigner(nil)),
+		builder.WithBuilderResolver(resolver),
+	).Build(ctx, model.VCData{
+		IssuerDID: issuerDID,
+		HolderDID: holderDID,
+		Policy: policy.NewPolicy(policy.WithStatements(policy.NewStatement(policy.EffectAllow,
+			[]policy.Action{policy.NewAction("Credential:Create")},
+			[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)}, policy.NewCondition()))),
+		CredentialStatus: []vc.Status{{
+			ID:                   "https://example.com/status/0#0",
+			Type:                 "StatusList2021Entry",
+			StatusPurpose:        "revocation",
+			StatusListIndex:      "0",
+			StatusListCredential: "https://example.com/status/0",
+		}},
+	}, builder.WithSignerOptions(signer.WithPrivateKey(crypto.FromECDSA(issuerPriv))))
+	if err != nil {
+		t.Fatalf("failed to build VC: %v", err)
+	}
+	vpResp, err := builder.NewVPBuilder(
+		builder.WithVPSigner(ecdsasigner.NewPrivSigner(nil)),
+		builder.WithVPBuilderResolver(resolver),
+	).Build(ctx, model.VPData{HolderDID: holderDID, VCTokens: []string{vcResp.Token}},
+		builder.WithVPSignerOptions(signer.WithPrivateKey(crypto.FromECDSA(holderPriv))))
+	if err != nil {
+		t.Fatalf("failed to build VP: %v", err)
+	}
+
+	result, err := VerifyPresentation(ctx, []byte(vpResp.Token), WithVPVerifyProof(), WithVPResolver(resolver))
+	if err != nil {
+		t.Fatalf("VerifyPresentation() error = %v", err)
+	}
+	if result.HolderDID != holderDID {
+		t.Fatalf("HolderDID = %q, want %q", result.HolderDID, holderDID)
 	}
 }
