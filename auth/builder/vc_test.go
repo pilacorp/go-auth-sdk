@@ -2,10 +2,12 @@ package builder
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,7 +96,7 @@ func TestAuthBuilder_Build(t *testing.T) {
 		ValidFrom:        &validFrom,
 		ValidUntil:       &validUntil,
 		CredentialStatus: expectedStatus,
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 	if err != nil {
 		t.Fatalf("Build() unexpected error: %v", err)
 	}
@@ -138,7 +140,7 @@ func TestAuthBuilder_Build_WithCustomFields(t *testing.T) {
 			"role":     "admin",
 		},
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 	if err != nil {
 		t.Fatalf("Build() with custom fields unexpected error: %v", err)
 	}
@@ -186,6 +188,104 @@ func TestAuthBuilder_Build_WithCustomFields(t *testing.T) {
 	}
 }
 
+func TestAuthBuilder_Build_RequirePresentation(t *testing.T) {
+	ctx := context.Background()
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
+
+	testPolicy := policy.NewPolicy(
+		policy.WithStatements(
+			policy.NewStatement(
+				policy.EffectAllow,
+				[]policy.Action{policy.NewAction("Credential:Create")},
+				[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+				policy.NewCondition(),
+			),
+		),
+	)
+
+	tests := []struct {
+		name                string
+		requirePresentation bool
+		wantTermsOfUse      []string
+	}{
+		{
+			name:                "default omits termsOfUse",
+			requirePresentation: false,
+			wantTermsOfUse:      nil,
+		},
+		{
+			name:                "opt-in attaches the presentation-required policy",
+			requirePresentation: true,
+			wantTermsOfUse:      []string{"PresentationRequiredPolicy"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewVCBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
+			result, err := b.Build(ctx, model.VCData{
+				IssuerDID:           "did:example:issuer",
+				HolderDID:           "did:example:holder",
+				Policy:              testPolicy,
+				CredentialStatus:    getDefaultTestStatus(),
+				RequirePresentation: tt.requirePresentation,
+			}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), WithVerificationMethodKey("key-1"), issuerResolver(t, privateKey))
+			if err != nil {
+				t.Fatalf("Build() unexpected error: %v", err)
+			}
+
+			cred, err := vc.ParseCredential([]byte(result.Token))
+			if err != nil {
+				t.Fatalf("ParseCredential() unexpected error: %v", err)
+			}
+
+			contents, err := cred.GetContents()
+			if err != nil {
+				t.Fatalf("GetContents() unexpected error: %v", err)
+			}
+
+			var payload struct {
+				Type       []string `json:"type"`
+				TermsOfUse []struct {
+					ID   string `json:"id"`
+					Type string `json:"type"`
+				} `json:"termsOfUse"`
+			}
+			if err := json.Unmarshal(contents, &payload); err != nil {
+				t.Fatalf("Unmarshal credential contents unexpected error: %v", err)
+			}
+
+			// The credential types must stay untouched either way.
+			wantTypes := []string{"VerifiableCredential", "AuthorizationCredential"}
+			if len(payload.Type) != len(wantTypes) {
+				t.Fatalf("type = %v, want %v", payload.Type, wantTypes)
+			}
+			for i, want := range wantTypes {
+				if payload.Type[i] != want {
+					t.Fatalf("type = %v, want %v", payload.Type, wantTypes)
+				}
+			}
+
+			if len(payload.TermsOfUse) != len(tt.wantTermsOfUse) {
+				t.Fatalf("termsOfUse = %+v, want %v", payload.TermsOfUse, tt.wantTermsOfUse)
+			}
+			for i, want := range tt.wantTermsOfUse {
+				if payload.TermsOfUse[i].Type != want {
+					t.Fatalf("termsOfUse[%d].type = %q, want %q", i, payload.TermsOfUse[i].Type, want)
+				}
+				if payload.TermsOfUse[i].ID != "" {
+					t.Fatalf("termsOfUse[%d].id = %q, want empty", i, payload.TermsOfUse[i].ID)
+				}
+			}
+		})
+	}
+}
+
 func TestAuthBuilder_WithSigner_NilPreservesDefault(t *testing.T) {
 	ctx := context.Background()
 	privateKey, err := crypto.GenerateKey()
@@ -213,7 +313,7 @@ func TestAuthBuilder_WithSigner_NilPreservesDefault(t *testing.T) {
 		HolderDID:        "did:example:holder",
 		Policy:           testPolicy,
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 	if err != nil {
 		t.Fatalf("Build() with WithSigner(nil) should succeed (uses default signer): %v", err)
 	}
@@ -238,7 +338,7 @@ func TestAuthBuilder_Build_EmptyPolicy(t *testing.T) {
 		HolderDID:        "did:example:holder",
 		Policy:           emptyPolicy,
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 
 	if err == nil {
 		t.Fatal("Build() with empty policy should fail")
@@ -272,7 +372,7 @@ func TestAuthBuilder_Build_WithoutValidityPeriod(t *testing.T) {
 		Policy:           testPolicy,
 		CredentialStatus: getDefaultTestStatus(),
 		// ValidFrom and ValidUntil are nil
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 
 	if err != nil {
 		t.Fatalf("Build() without validity period should succeed: %v", err)
@@ -311,7 +411,7 @@ func TestAuthBuilder_Build_OnlyValidFrom(t *testing.T) {
 		ValidFrom:        &validFrom,
 		CredentialStatus: getDefaultTestStatus(),
 		// ValidUntil is nil
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 
 	if err != nil {
 		t.Fatalf("Build() with only ValidFrom should succeed: %v", err)
@@ -347,7 +447,7 @@ func TestAuthBuilder_Build_MultipleCredentials(t *testing.T) {
 			HolderDID:        holderDID,
 			Policy:           testPolicy,
 			CredentialStatus: getDefaultTestStatus(),
-		}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+		}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 
 		if err != nil {
 			t.Fatalf("Build() #%d failed: %v", i+1, err)
@@ -418,7 +518,7 @@ func TestAuthBuilder_Build_EmptyHolderDID(t *testing.T) {
 		HolderDID:        "", // Empty holder DID
 		Policy:           testPolicy,
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 
 	// Empty holder DID should return error
 	if err == nil {
@@ -447,10 +547,10 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 		),
 	)
 
-	// Generate a mock signature (64 bytes)
-	mockSignature := make([]byte, 64)
-	for i := range mockSignature {
-		mockSignature[i] = byte(i % 256)
+	// The mock Vault signs with this key, which the issuer DID publishes.
+	vaultKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate vault key: %v", err)
 	}
 
 	signerAddress := "0x1234567890123456789012345678901234567890"
@@ -475,6 +575,14 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("Failed to decode request: %v", err)
 		}
+		digest, err := hex.DecodeString(strings.TrimPrefix(req.Payload, "0x"))
+		if err != nil {
+			t.Errorf("Failed to decode payload: %v", err)
+		}
+		signedDigest, err := crypto.Sign(digest, vaultKey)
+		if err != nil {
+			t.Errorf("Failed to sign payload: %v", err)
+		}
 
 		// Create response
 		response := struct {
@@ -485,7 +593,7 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 			Data: struct {
 				Signed string `json:"signature"`
 			}{
-				Signed: "0x" + hex.EncodeToString(mockSignature),
+				Signed: "0x" + hex.EncodeToString(signedDigest),
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -509,7 +617,7 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 		ValidFrom:        &validFrom,
 		ValidUntil:       &validUntil,
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithSignerOptions(signer.WithSignerAddress(signerAddress)))
+	}, WithSignerOptions(signer.WithSignerAddress(signerAddress)), issuerResolver(t, vaultKey))
 
 	if err != nil {
 		t.Fatalf("Build() with Vault signer unexpected error: %v", err)
@@ -521,6 +629,55 @@ func TestAuthBuilder_Build_WithVaultSigner(t *testing.T) {
 		t.Error("Build() should return non-empty token with Vault signer")
 	}
 	t.Logf("Credential with Vault signer: %s", result.Token)
+}
+
+func TestAuthBuilder_Build_WithVerificationMethodKey(t *testing.T) {
+	ctx := context.Background()
+
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+
+	ecdsaSigner := ecdsa.NewPrivSigner(nil)
+
+	testPolicy := policy.NewPolicy(
+		policy.WithStatements(
+			policy.NewStatement(
+				policy.EffectAllow,
+				[]policy.Action{policy.NewAction("Credential:Create")},
+				[]policy.Resource{policy.NewResource(policy.ResourceObjectCredential)},
+				policy.NewCondition(),
+			),
+		),
+	)
+
+	builder := NewVCBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(ecdsaSigner))
+	result, err := builder.Build(ctx, model.VCData{
+		IssuerDID:        "did:example:issuer",
+		HolderDID:        "did:example:holder",
+		Policy:           testPolicy,
+		CredentialStatus: getDefaultTestStatus(),
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), WithVerificationMethodKey("key-2"),
+		WithBuilderResolver(twoKeyIssuerResolver(t, &privateKey.PublicKey)))
+	if err != nil {
+		t.Fatalf("Build() unexpected error: %v", err)
+	}
+	if result == nil || result.Token == "" {
+		t.Fatalf("Build() returned empty token")
+	}
+	parts := strings.Split(result.Token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("Build() returned invalid JWT: %s", result.Token)
+	}
+	headerBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		t.Fatalf("Decode JWT header: %v", err)
+	}
+	if !strings.Contains(string(headerBytes), "\"kid\":\"did:example:issuer#key-2\"") {
+		t.Fatalf("Build() header missing expected kid, got header: %s", string(headerBytes))
+	}
 }
 
 func TestAuthBuilder_Build_WithVaultSigner_MissingAddress(t *testing.T) {
@@ -595,7 +752,7 @@ func TestAuthBuilder_Build_OverrideSigner(t *testing.T) {
 	)
 
 	// Create builder with signer1
-	builder := NewVCBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(signer1))
+	builder := NewVCBuilder(WithBuilderSchemaID("https://example.com/schema/v1"), WithSigner(signer1), issuerResolver(t, privateKey1))
 
 	// Build with signer1 (default from builder)
 	result1, err := builder.Build(ctx, model.VCData{
@@ -617,7 +774,7 @@ func TestAuthBuilder_Build_OverrideSigner(t *testing.T) {
 		HolderDID:        "did:example:holder2",
 		Policy:           testPolicy,
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithSigner(signer2), WithSignerOptions(signer.WithPrivateKey(privateKeyBytes2)))
+	}, WithSigner(signer2), WithSignerOptions(signer.WithPrivateKey(privateKeyBytes2)), issuerResolver(t, privateKey2))
 	if err != nil {
 		t.Fatalf("Build() with overridden signer should succeed: %v", err)
 	}
@@ -681,7 +838,7 @@ func TestAuthBuilder_Build_OverrideSchemaID(t *testing.T) {
 		HolderDID:        "did:example:holder1",
 		Policy:           testPolicy,
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 	if err != nil {
 		t.Fatalf("Build() with default schemaID should succeed: %v", err)
 	}
@@ -695,7 +852,7 @@ func TestAuthBuilder_Build_OverrideSchemaID(t *testing.T) {
 		HolderDID:        "did:example:holder2",
 		Policy:           testPolicy,
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithBuilderSchemaID(schemaID2), WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithBuilderSchemaID(schemaID2), WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 	if err != nil {
 		t.Fatalf("Build() with overridden schemaID should succeed: %v", err)
 	}
@@ -710,7 +867,7 @@ func TestAuthBuilder_Build_OverrideSchemaID(t *testing.T) {
 		HolderDID:        "did:example:holder3",
 		Policy:           testPolicy,
 		CredentialStatus: getDefaultTestStatus(),
-	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+	}, WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)), issuerResolver(t, privateKey))
 	if err != nil {
 		t.Fatalf("Build() with original schemaID should still work: %v", err)
 	}

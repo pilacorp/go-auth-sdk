@@ -33,7 +33,7 @@ go get github.com/pilacorp/go-auth-sdk
   - credentialStatus (revocation)
 - **Sign credential**: uses `signer.Signer` (ECDSA or Vault) → produces VC-JWT.
 - **Holder**: calls API with header `Authorization: Bearer <vc-jwt>`.
-- **Service**: uses `verifier.Verify` to:
+- **Service**: uses `verifier.VCVerify` to:
   - verify signature, expiration, schema, revocation (via options)
   - extract normalized issuer DID, holder DID, and permissions.
 - **Holder (presentation)**: uses `builder.NewVPBuilder(...).Build(...)` to create a VP-JWT from one or many VC-JWTs.
@@ -48,9 +48,10 @@ type VCData struct {
 	HolderDID        string        // required: Holder DID (credentialSubject.id)
 	Policy           policy.Policy // required: permissions list
 	CustomFields     map[string]any // optional: additional credentialSubject fields for custom business logic
-	ValidFrom        *time.Time    // optional: credential validity start time
+	ValidFrom        *time.Time    // optional: credential validity start time (defaults to build time)
 	ValidUntil       *time.Time    // optional: credential validity end time
 	CredentialStatus []vc.Status   // required: status information (revocation) for revocation checking
+	RequirePresentation bool       // optional: mark the VC as usable only inside a VP (default false)
 }
 ```
 
@@ -94,6 +95,55 @@ p := policy.NewPolicy(
   - Add custom key-value pairs to `credentialSubject` for business-specific data (e.g., tenant, role, metadata).
   - Type: `map[string]any`.
   - Reserved key: `permissions` is managed by `Policy` and will be set by the SDK.
+
+- **RequirePresentation** (optional, default `false`):
+  - Marks the credential as usable **only** when presented inside a Verifiable Presentation, never on its own.
+  - When `true`, the SDK attaches a `termsOfUse` entry of type `"PresentationRequiredPolicy"`; when `false` (or omitted) no `termsOfUse` is emitted and the credential is byte-for-byte what it was before.
+  - The credential `type` array is unaffected — it stays `["VerifiableCredential", "AuthorizationCredential"]` either way.
+  - `termsOfUse` is fully controlled by the SDK — callers can only opt in/out of this policy, they cannot supply arbitrary policies.
+
+```go
+result, err := builder.Build(ctx, model.VCData{
+	IssuerDID:           "did:example:issuer",
+	HolderDID:           "did:example:holder",
+	Policy:              testPolicy,
+	CredentialStatus:    credentialStatus,
+	RequirePresentation: true,
+}, builder.WithSignerOptions(signer.WithPrivateKey(privateKeyBytes)))
+```
+
+Produces:
+
+```json
+"type": ["VerifiableCredential", "AuthorizationCredential"],
+"termsOfUse": [{ "type": "PresentationRequiredPolicy" }]
+```
+
+**The SDK issues this marker but does not enforce it.** `verifier.VCVerify` neither reads
+`termsOfUse` nor rejects a bare VC-JWT that carries the policy — enforcement is left to the
+relying party, because only the relying party knows whether the token arrived on its own or
+inside a presentation.
+
+To enforce it, call `verifier.RequiresPresentation` where a bare token enters your service —
+a credential obtained through `verifier.VerifyPresentation` has already satisfied the
+condition, the same credential arriving in an `Authorization: Bearer` header has not:
+
+```go
+// Bare VC-JWT from a request header.
+required, err := verifier.RequiresPresentation(bearerToken)
+if err != nil {
+	return err
+}
+if required {
+	return fmt.Errorf("credential must be presented inside a verifiable presentation")
+}
+
+result, err := verifier.VCVerify(ctx, []byte(bearerToken), verifier.WithVerifyProof())
+```
+
+`RequiresPresentation` only reads what the token claims — it does not verify anything, so
+pair it with `VCVerify`. The policy type is exported as
+`verifier.PresentationRequiredPolicy` for callers that need to match on it directly.
 
  - **CredentialStatus** (required):
   - Used to attach status information to the credential (especially for revocation checking).
@@ -275,10 +325,12 @@ p := policy.NewPolicy(policy.WithStatements(stmt))
 // Create signer
 ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
-// Create VCBuilder with schema ID
+// Create VCBuilder with schema ID and the DID registry of your environment.
+// Building resolves the issuer DID to pick the signing key (see "Builder DID resolution").
 vcBuilder := builder.NewVCBuilder(
 	builder.WithBuilderSchemaID("https://example.com/schema/v1"),
 	builder.WithSigner(ecdsaSigner),
+	builder.WithBuilderBaseURL("https://api.ndadid.vn/api/v1/did"),
 )
 
 // Build credential
@@ -305,6 +357,25 @@ if err != nil {
 fmt.Println("VC-JWT:", result.Token)
 ```
 
+**Builder DID resolution**
+
+Since go-credential-sdk v1.13, building a VC or VP resolves the signer's DID document
+(issuer for a VC, holder for a VP) to choose the verification method named in the JWT `kid`,
+and the signature must verify against that method's key — a signer holding another key fails
+at build time, not at verification.
+
+| VC builder | VP builder | Purpose |
+|------------|------------|---------|
+| `WithBuilderBaseURL(url)` | `WithVPBuilderBaseURL(url)` | DID registry used to resolve the signer DID |
+| `WithBuilderResolver(r)` | `WithVPBuilderResolver(r)` | Custom `verificationmethod.ResolverProvider` (takes precedence over the base URL) |
+| `WithVerificationMethodKey(key)` | `WithVPBuilderVerificationMethodKey(key)` | Pin the VM fragment (e.g. `key-2`); by default the latest active VM in `assertionMethod` (VC) / `authentication` (VP) |
+
+Without a base URL or resolver, the builder uses go-credential-sdk's default — the production
+registry `https://api.ndadid.vn/api/v1/did`, or the URL passed to `vc.Init` / `vp.Init`.
+The signer DID document must list the signing VM under `assertionMethod` (issuer) or
+`authentication` (holder). When `ValidFrom` is not set, the builder uses the build time so the
+token always carries `iat` (needed to verify it after the signing VM is revoked).
+
 #### 5. Verify Credential (Check VC-JWT + Extract Permissions)
 
 ```go
@@ -312,7 +383,7 @@ import "github.com/pilacorp/go-auth-sdk/auth/verifier"
 
 ctx := context.Background()
 
-result, err := verifier.Verify(
+result, err := verifier.VCVerify(
 	ctx,
 	[]byte(credentialToken),
 	verifier.WithVerifyProof(),                  // enable signature verification
@@ -344,8 +415,10 @@ import (
 )
 
 vpSigner := ecdsa.NewPrivSigner(nil)
+// Building resolves the holder DID; its document must list the holder's VM under authentication.
 vpBuilder := builder.NewVPBuilder(
 	builder.WithVPSigner(vpSigner),
+	builder.WithVPBuilderBaseURL("https://api.ndadid.vn/api/v1/did"),
 )
 
 vpResp, err := vpBuilder.Build(ctx, model.VPData{
@@ -362,9 +435,7 @@ fmt.Println("VP-JWT:", vpResp.Token)
 **Verify VP:**
 
 > Note:
-> - `WithVPResolver(...)` is optional.
-> - Custom resolver-based VP proof verification is not supported yet in the current version.
-> - For now, use `WithVPVerifyProof()` with DID base URL options for VP proof verification.
+> - `WithVPResolver(...)` is optional. When set, it is used for VP proof verification instead of the DID base URL.
 
 ```go
 import "github.com/pilacorp/go-auth-sdk/auth/verifier"
@@ -386,7 +457,7 @@ fmt.Println("Holder DID:", vpResult.HolderDID)
 // Each embedded VC is returned as a raw token. Verify each VC independently
 // based on your business logic (e.g., different schema, policy requirements).
 for i, vc := range vpResult.VCs {
-	vcResult, err := verifier.Verify(ctx, []byte(vc.Token),
+	vcResult, err := verifier.VCVerify(ctx, []byte(vc.Token),
 		verifier.WithVerifyProof(),
 		verifier.WithCheckExpiration(),
 		verifier.WithVerifyPermissions(),
@@ -407,6 +478,6 @@ for i, vc := range vpResult.VCs {
 - `auth/verifier/`: Current VC/VP verifier package.
 - `auth/model/`: Shared request/response types.
 - `auth/policy/`: Policy/permission data types and validation functions.
-- `auth/`: Legacy compatibility layer kept during the package split transition.
+- `auth/status/`: Credential status (revocation) builder.
 - `signer/`: `Signer` interface + implementations: ECDSA signer, Vault signer.
 - `examples/`: SDK usage examples.

@@ -3,26 +3,39 @@
 // The package provides:
 //   - AuthBuilder: A builder for creating and signing VC-JWT credentials with embedded permissions
 //   - VPBuilder: A builder for creating and signing VP-JWT presentations with embedded VC tokens
-//   - Builder options: Configurable options for schema IDs, signer implementations, and signer options
+//   - Builder options: Configurable options for schema IDs, signer implementations, signer options,
+//     and DID resolution (resolver, DID base URL, verification method key)
+//
+// Building resolves the issuer's (VC) or holder's (VP) DID document to pick the
+// signing verification method, and the signature must verify against it. Without
+// a resolver or base URL option, resolution uses go-credential-sdk's default
+// (the production DID registry, or the URL passed to vc.Init / vp.Init).
 package builder
 
 import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pilacorp/go-auth-sdk/auth/model"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
 	vcdto "github.com/pilacorp/go-credential-sdk/credential/common/dto"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
 // VCBuilderConfig is a configuration for the VCBuilder.
 type VCBuilderConfig struct {
 	// Credential configuration
-	schemaID string
+	schemaID              string
+	verificationMethodKey string
+
+	// DID resolution — used when verificationMethodKey is empty.
+	didBaseURL string
+	resolver   verificationmethod.ResolverProvider
 
 	// Signing configuration (could be separate)
 	signer        signer.Signer
@@ -41,6 +54,30 @@ type VCBuilderConfigOption func(*VCBuilderConfig)
 func WithBuilderSchemaID(schemaID string) VCBuilderConfigOption {
 	return func(b *VCBuilderConfig) {
 		b.schemaID = schemaID
+	}
+}
+
+// WithVerificationMethodKey pins the VM fragment used for the JWT `kid`.
+// If empty, the SDK resolves the latest active VM in assertionMethod.
+func WithVerificationMethodKey(key string) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
+		b.verificationMethodKey = key
+	}
+}
+
+// WithBuilderBaseURL sets the DID resolver base URL. Used when no
+// explicit resolver is supplied. Ignored if WithBuilderResolver is set.
+func WithBuilderBaseURL(baseURL string) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
+		b.didBaseURL = baseURL
+	}
+}
+
+// WithBuilderResolver injects a DID document resolver. Takes precedence
+// over WithBuilderBaseURL.
+func WithBuilderResolver(resolver verificationmethod.ResolverProvider) VCBuilderConfigOption {
+	return func(b *VCBuilderConfig) {
+		b.resolver = resolver
 	}
 }
 
@@ -102,6 +139,15 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 		data.ID = uuid.NewString()
 	}
 
+	// Terms of use are controlled by the SDK; callers may only opt into the
+	// presentation-required policy, not supply arbitrary policies.
+	var termsOfUse []vc.TermsOfUse
+	if data.RequirePresentation {
+		termsOfUse = append(termsOfUse, vc.TermsOfUse{
+			Type: "PresentationRequiredPolicy",
+		})
+	}
+
 	vcContents := vc.CredentialContents{
 		Context: []any{
 			"https://www.w3.org/ns/credentials/v2",
@@ -118,9 +164,12 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 		Types:            []string{"VerifiableCredential", "AuthorizationCredential"},
 		Subject:          subjects,
 		CredentialStatus: data.CredentialStatus,
+		TermsOfUse:       termsOfUse,
 	}
 
-	// Add validity period if provided
+	// Default validFrom to now so the token always carries iat; the verifier
+	// rejects a token without iat once the signing VM has a revocation time.
+	vcContents.ValidFrom = time.Now()
 	if data.ValidFrom != nil {
 		vcContents.ValidFrom = *data.ValidFrom
 	}
@@ -129,7 +178,7 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 	}
 
 	// Create JWT credential
-	vcCredential, err := vc.NewJWTCredential(vcContents)
+	vcCredential, err := vc.NewJWTCredential(vcContents, options.credentialOptions()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT credential: %w", err)
 	}
@@ -174,6 +223,22 @@ func (b *VCBuilder) Build(ctx context.Context, data model.VCData, opts ...VCBuil
 	}, nil
 }
 
+// credentialOptions maps the DID resolution settings to SDK options. Unset
+// values are left out so the SDK keeps its own defaults (vc.Init base URL).
+func (c *VCBuilderConfig) credentialOptions() []vc.CredentialOpt {
+	var opts []vc.CredentialOpt
+	if c.verificationMethodKey != "" {
+		opts = append(opts, vc.WithVerificationMethodKey(c.verificationMethodKey))
+	}
+	if c.didBaseURL != "" {
+		opts = append(opts, vc.WithBaseURL(c.didBaseURL))
+	}
+	if c.resolver != nil {
+		opts = append(opts, vc.WithResolver(c.resolver))
+	}
+	return opts
+}
+
 // validateVCData validates that the required fields in model.VCData are present.
 func validateVCData(data model.VCData, options *VCBuilderConfig) error {
 	if options.schemaID == "" {
@@ -207,9 +272,12 @@ func validateVCData(data model.VCData, options *VCBuilderConfig) error {
 func (b *VCBuilder) mergeConfig(opts ...VCBuilderConfigOption) *VCBuilderConfig {
 	// merge the options into the builder config
 	options := &VCBuilderConfig{
-		schemaID:      b.config.schemaID,
-		signer:        b.config.signer,
-		signerOptions: make([]signer.SignOption, len(b.config.signerOptions)),
+		schemaID:              b.config.schemaID,
+		verificationMethodKey: b.config.verificationMethodKey,
+		didBaseURL:            b.config.didBaseURL,
+		resolver:              b.config.resolver,
+		signer:                b.config.signer,
+		signerOptions:         make([]signer.SignOption, len(b.config.signerOptions)),
 	}
 	copy(options.signerOptions, b.config.signerOptions)
 

@@ -14,7 +14,6 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/verifier"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
-	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -34,7 +33,7 @@ func main() {
 	ecdsaSigner := ecdsa.NewPrivSigner(nil)
 
 	issuerPubHex := hex.EncodeToString(crypto.FromECDSAPub(&privateKey.PublicKey))
-	staticResolver, err := verificationmethod.NewStaticResolver(issuerPubHex)
+	staticResolver, err := verifier.NewStaticResolver(issuerPubHex)
 	if err != nil {
 		log.Fatalf("Failed to create static resolver: %v", err)
 	}
@@ -68,7 +67,13 @@ func main() {
 	validFrom := time.Now()
 	validUntil := time.Now().Add(24 * time.Hour)
 
-	authBuilder := builder.NewVCBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
+	// The builder resolves the issuer DID to pick the signing key. Production
+	// code passes builder.WithBuilderBaseURL(<DID registry of the environment>).
+	authBuilder := builder.NewVCBuilder(
+		builder.WithBuilderSchemaID(schemaID),
+		builder.WithSigner(ecdsaSigner),
+		builder.WithBuilderResolver(staticResolver),
+	)
 	result, err := authBuilder.Build(ctx, model.VCData{
 		IssuerDID:        issuerDID,
 		HolderDID:        "did:example:holder",

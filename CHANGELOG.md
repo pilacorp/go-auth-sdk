@@ -5,7 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- VC/VP builders no longer pass an empty DID base URL to go-credential-sdk when `WithBuilderBaseURL` / `WithVPBuilderBaseURL` is not set, which broke every such build in `v1.3.0` ("unsupported protocol scheme"); the SDK default and `vc.Init` / `vp.Init` apply again
+- `verifier.WithVPResolver` is now passed to presentation verification; it was previously stored and ignored
+
+### Changed
+- When `ValidFrom` is not set, VCs and VPs now carry `validFrom` (and `iat` / `nbf`) set to the build time, so tokens always carry `iat`. The verifier rejects a token without `iat` once the verification method that signed it has a revocation time
+
 ## [Released]
+
+## [v1.3.0]
+
+### Breaking
+- Requires `github.com/pilacorp/go-credential-sdk` `v1.13.1`. `verificationmethod.ResolverProvider` (accepted by `verifier.WithResolver`, `verifier.WithVPResolver` and the builder resolver options) now has `ResolveDocument(ctx, did) (*DIDDocument, error)` instead of `GetPublicKey(kid)`
+- Building a VC/VP resolves the signer DID (issuer / holder) and checks the signature against the chosen verification method. The DID must be resolvable from the configured registry, and its document must list the VM under `assertionMethod` (issuer) or `authentication` (holder)
+
+### Added
+- Builder DID resolution options: `WithBuilderBaseURL`, `WithBuilderResolver`, `WithVerificationMethodKey` (VC) and `WithVPBuilderBaseURL`, `WithVPBuilderResolver`, `WithVPBuilderVerificationMethodKey` (VP)
+- `verifier.NewStaticResolver` for tests and examples
+
+## [v1.2.0]
+
+### Added
+- `model.VCData.RequirePresentation` (optional, defaults to `false`): when `true`, the VC builder attaches a `termsOfUse` entry of type `PresentationRequiredPolicy` to mark a credential that must only be consumed inside a Verifiable Presentation. The credential `type` array is left untouched
+- `verifier.RequiresPresentation(token)` and `verifier.PresentationRequiredPolicy`: reads the `termsOfUse` marker off a VC-JWT so relying parties do not each reimplement the check. The SDK still does not enforce the policy — `VCVerify` cannot know whether a token arrived on its own or inside a presentation
+- `status.StatusBuilder` now rejects a status provider response whose entry has no `type`, instead of deferring the failure to credential build time where the error no longer points at the response that caused it
+
+### Changed
+- Bumped `github.com/pilacorp/go-credential-sdk` from `v1.6.0` to `v1.9.1`, which adds `vc.TermsOfUse`. Note that `v1.9.1` also makes `type` required on `credentialStatus`: a `vc.Status` with an empty `Type` now fails the credential build instead of being silently skipped
 
 ## [v1.1.1]
 

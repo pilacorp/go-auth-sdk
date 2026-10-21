@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/pilacorp/go-auth-sdk/auth/policy"
 	"github.com/pilacorp/go-auth-sdk/signer"
 	"github.com/pilacorp/go-auth-sdk/signer/ecdsa"
+	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
 	"github.com/pilacorp/go-credential-sdk/credential/vc"
 )
 
@@ -85,7 +87,17 @@ func main() {
 	fmt.Println("✓ Created credential status")
 
 	// Step 7: Create AuthBuilder
-	authBuilder := builder.NewVCBuilder(builder.WithBuilderSchemaID(schemaID), builder.WithSigner(ecdsaSigner))
+	// The builder resolves the issuer DID to pick the signing key, and the
+	// signature must verify against it. This example publishes the key through
+	// an in-memory resolver; production code passes
+	// builder.WithBuilderBaseURL(<DID registry of the environment>) instead.
+	resolver := verificationmethod.NewStaticResolver(verificationmethod.NewDIDDocument(issuerDID,
+		verificationmethod.NewSecp256k1VM(issuerDID, "key-1", hex.EncodeToString(crypto.FromECDSAPub(&privateKey.PublicKey)))))
+	authBuilder := builder.NewVCBuilder(
+		builder.WithBuilderSchemaID(schemaID),
+		builder.WithSigner(ecdsaSigner),
+		builder.WithBuilderResolver(resolver),
+	)
 	fmt.Println("✓ Created AuthBuilder")
 
 	// Step 8: Build the credential

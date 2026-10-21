@@ -113,5 +113,9 @@ func (p *statusBuilder) CreateStatus(ctx context.Context, issuerDID string) ([]v
 		return nil, fmt.Errorf("failed to decode status provider response: %w", err)
 	}
 
+	if res.Data.Type == "" {
+		return nil, fmt.Errorf("status provider API returned an entry without a type")
+	}
+
 	return []vc.Status{res.Data}, nil
 }
