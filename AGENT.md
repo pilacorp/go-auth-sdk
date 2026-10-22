@@ -135,6 +135,8 @@ vpBuilder := builder.NewVPBuilder(
 vpResp, err := vpBuilder.Build(context.Background(), model.VPData{
     HolderDID: "did:example:holder",
     VCTokens:  []string{vcToken1, vcToken2},
+    Audience:  "did:example:verifier", // optional: signed into "aud"
+    Nonce:     uuid.NewString(),       // optional: signed into "nonce"
 }, builder.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)))
 if err != nil {
     // Handle error
@@ -154,6 +156,7 @@ vpResult, err := verifier.VerifyPresentation(
     verifier.WithVPVerifyProof(),
     verifier.WithVPCheckExpiration(),
     verifier.WithVPDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
+    verifier.WithVPExpectedAudience("did:example:verifier"), // optional: refuse VPs meant for another verifier
 )
 if err != nil {
     // Handle error
@@ -161,6 +164,8 @@ if err != nil {
 
 // Access holder DID
 holderDID := vpResult.HolderDID
+
+// vpResult.Nonce is the VP's "nonce" claim (empty if none); refuse one already seen to make the VP single use
 
 // Each embedded VC is returned as a raw token. Verify each VC independently.
 for i, vc := range vpResult.VCs {
@@ -348,6 +353,7 @@ against the chosen VM. Without these options the SDK default (production registr
 |--------|---------|
 | `WithVerifyProof()` | Verify cryptographic signature |
 | `WithCheckExpiration()` | Check validity period |
+| `WithLeeway(d)` | Tolerate clock skew of `d` on the time checks (default: 0) |
 | `WithSchemaValidation()` | Validate against schema |
 | `WithCheckRevocation()` | Check revocation status |
 | `WithVerifySchemaID(id)` | Expect specific schema ID |
@@ -362,6 +368,8 @@ against the chosen VM. Without these options the SDK default (production registr
 |--------|---------|
 | `WithVPVerifyProof()` | Verify VP cryptographic signature/proof |
 | `WithVPCheckExpiration()` | Check VP validity period |
+| `WithVPLeeway(d)` | Tolerate clock skew of `d` on the VP time checks (default: 0) |
+| `WithVPExpectedAudience(aud)` | Refuse a VP whose `aud` does not name `aud` (turns on proof verification) |
 | `WithVPDIDBaseURL(url)` | DID resolution endpoint for VP proof verification |
 | `WithVPVerificationMethodKey(key)` | Verification method key (default: `key-1`) |
 | `WithVPResolver(resolver)` | Custom DID resolver for VP proof verification |

@@ -424,6 +424,10 @@ vpBuilder := builder.NewVPBuilder(
 vpResp, err := vpBuilder.Build(ctx, model.VPData{
 	HolderDID: "did:nda:testnet:0xHOLDER",
 	VCTokens:  []string{vcToken1, vcToken2},
+	// Optional. Audience binds the VP to one verifier ("aud" claim); Nonce makes
+	// it unique ("nonce" claim) so the verifier can refuse a replay.
+	Audience: "did:nda:testnet:0xVERIFIER",
+	Nonce:    uuid.NewString(),
 }, builder.WithVPSignerOptions(signer.WithPrivateKey(holderPrivateKeyBytes)))
 if err != nil {
 	log.Fatalf("build presentation error: %v", err)
@@ -436,6 +440,8 @@ fmt.Println("VP-JWT:", vpResp.Token)
 
 > Note:
 > - `WithVPResolver(...)` is optional. When set, it is used for VP proof verification instead of the DID base URL.
+> - `WithVPExpectedAudience(...)` is optional. When set, a VP whose `aud` does not name this verifier, or that has no `aud`, is refused.
+> - `vpResult.Nonce` holds the VP's `nonce` claim (empty if none). Refuse a nonce you have already seen to make a VP single use.
 
 ```go
 import "github.com/pilacorp/go-auth-sdk/auth/verifier"
@@ -447,12 +453,14 @@ vpResult, err := verifier.VerifyPresentation(
 	verifier.WithVPCheckExpiration(),
 	verifier.WithVPDIDBaseURL("https://api.ndadid.vn/api/v1/did"),
 	verifier.WithVPVerificationMethodKey("key-1"),
+	verifier.WithVPExpectedAudience("did:nda:testnet:0xVERIFIER"),
 )
 if err != nil {
 	log.Fatalf("verify presentation error: %v", err)
 }
 
 fmt.Println("Holder DID:", vpResult.HolderDID)
+fmt.Println("Nonce:", vpResult.Nonce)
 
 // Each embedded VC is returned as a raw token. Verify each VC independently
 // based on your business logic (e.g., different schema, policy requirements).

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/pilacorp/go-auth-sdk/auth/model"
 
@@ -31,6 +32,7 @@ type verifyOptions struct {
 	verificationMethodKey string
 	isVerifyProof         bool
 	isCheckExpiration     bool
+	leeway                time.Duration
 	isCheckRevocation     bool
 	isValidateSchema      bool
 	schemaLoader          vc.SchemaLoaderFunc
@@ -95,6 +97,18 @@ func WithVerifyProof() VerifyOpt {
 func WithCheckExpiration() VerifyOpt {
 	return func(o *verifyOptions) {
 		o.isCheckExpiration = true
+	}
+}
+
+// WithLeeway tolerates clock skew between the issuer and this verifier: the
+// validFrom/validUntil and JWT nbf/exp checks are widened by d on both sides.
+// It only loosens checks that are already on, such as WithCheckExpiration.
+// Zero, the default, compares exactly; a negative d counts as zero. Keep d to
+// the skew you expect, usually seconds: an expired credential stays usable
+// for that long.
+func WithLeeway(d time.Duration) VerifyOpt {
+	return func(o *verifyOptions) {
+		o.leeway = d
 	}
 }
 
@@ -320,6 +334,10 @@ func buildCredentialOptions(opts *verifyOptions) []vc.CredentialOpt {
 
 	if opts.isCheckExpiration {
 		credOpts = append(credOpts, vc.WithCheckExpiration())
+	}
+
+	if opts.leeway > 0 {
+		credOpts = append(credOpts, vc.WithLeeway(opts.leeway))
 	}
 
 	if opts.isCheckRevocation {

@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/google/uuid v1.6.0
-	github.com/pilacorp/go-credential-sdk v1.13.1
+	github.com/pilacorp/go-credential-sdk v1.14.0
 )
 
 require (
