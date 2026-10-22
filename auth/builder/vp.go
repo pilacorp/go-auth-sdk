@@ -158,8 +158,18 @@ func (b *VPBuilder) Build(ctx context.Context, data model.VPData, opts ...VPBuil
 		contents.ValidUntil = *data.ValidUntil
 	}
 
+	// aud and nonce must be set here: the signature is made outside the SDK and
+	// covers the signing input, so AddCustomProof refuses to add them later.
+	presentationOpts := options.presentationOptions()
+	if data.Audience != "" {
+		presentationOpts = append(presentationOpts, vp.WithDomain(data.Audience))
+	}
+	if data.Nonce != "" {
+		presentationOpts = append(presentationOpts, vp.WithChallenge(data.Nonce))
+	}
+
 	// Create JWT presentation
-	presentation, err := vp.NewJWTPresentation(contents, options.presentationOptions()...)
+	presentation, err := vp.NewJWTPresentation(contents, presentationOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWT presentation: %w", err)
 	}
