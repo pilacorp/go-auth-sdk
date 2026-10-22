@@ -8,9 +8,12 @@ package verifier
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/pilacorp/go-auth-sdk/auth/model"
 	verificationmethod "github.com/pilacorp/go-credential-sdk/credential/common/verification-method"
@@ -26,10 +29,20 @@ type vpVerifyOptions struct {
 	verificationMethodKey string
 	isVerifyProof         bool
 	isCheckExpiration     bool
+	leeway                time.Duration
 	resolver              verificationmethod.ResolverProvider
+
+	// expectedAudience is set by WithVPExpectedAudience; hasExpectedAudience
+	// tells an option given an empty value apart from no option at all.
+	expectedAudience    string
+	hasExpectedAudience bool
 }
 
 func (o *vpVerifyOptions) validate() error {
+	if o.hasExpectedAudience && o.expectedAudience == "" {
+		return fmt.Errorf("expected audience must not be empty")
+	}
+
 	if o.didBaseURL != "" {
 		parsedURL, err := url.Parse(o.didBaseURL)
 		if err != nil {
@@ -79,6 +92,32 @@ func WithVPVerifyProof() VPVerifyOpt {
 func WithVPCheckExpiration() VPVerifyOpt {
 	return func(o *vpVerifyOptions) {
 		o.isCheckExpiration = true
+	}
+}
+
+// WithVPLeeway tolerates clock skew between the holder and this verifier: the
+// validFrom/validUntil and JWT nbf/exp checks are widened by d on both sides.
+// The VP builder stamps validFrom with the holder's clock, so a holder whose
+// clock runs ahead is otherwise refused on first use. It only loosens checks
+// that are already on, such as WithVPCheckExpiration. Zero, the default,
+// compares exactly; a negative d counts as zero. The embedded VCs are verified
+// separately: pass WithLeeway to VCVerify for them.
+func WithVPLeeway(d time.Duration) VPVerifyOpt {
+	return func(o *vpVerifyOptions) {
+		o.leeway = d
+	}
+}
+
+// WithVPExpectedAudience accepts only a presentation whose "aud" claim names aud
+// (a JSON-LD presentation: whose proof.domain does). One that names another
+// verifier, or none, is refused, so a VP captured at one service cannot be
+// replayed at another. It turns on proof verification, since an audience is
+// only meaningful on a verified signature. An empty aud is a configuration
+// error rather than a silent no-op.
+func WithVPExpectedAudience(aud string) VPVerifyOpt {
+	return func(o *vpVerifyOptions) {
+		o.expectedAudience = aud
+		o.hasExpectedAudience = true
 	}
 }
 
@@ -140,9 +179,15 @@ func VerifyPresentation(ctx context.Context, presentation []byte, opts ...VPVeri
 		return nil, fmt.Errorf("failed to extract VC tokens: %w", err)
 	}
 
+	nonce, err := extractNonce(parsedVP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract nonce: %w", err)
+	}
+
 	return &model.VPVerifyResult{
 		HolderDID: holderDID,
 		VCs:       vcTokens,
+		Nonce:     nonce,
 	}, nil
 }
 
@@ -186,11 +231,67 @@ func buildVPOptions(opts *vpVerifyOptions) []vp.PresentationOpt {
 		vpOpts = append(vpOpts, vp.WithCheckExpiration())
 	}
 
+	if opts.leeway > 0 {
+		vpOpts = append(vpOpts, vp.WithLeeway(opts.leeway))
+	}
+
 	if opts.resolver != nil {
 		vpOpts = append(vpOpts, vp.WithResolver(opts.resolver))
 	}
 
+	if opts.expectedAudience != "" {
+		// Implies proof verification in the credential SDK.
+		vpOpts = append(vpOpts, vp.WithExpectedDomain(opts.expectedAudience))
+	}
+
 	return vpOpts
+}
+
+// extractNonce returns the "nonce" claim of a JWT or vp+jwt presentation, or ""
+// when there is none. The credential SDK checks nonce against an expected value
+// but does not expose it, so it is read from the payload the SDK has already
+// parsed (and verified, when proof verification is on). A JSON-LD presentation
+// keeps its challenge in the proof instead and yields "".
+func extractNonce(parsedVP vp.Presentation) (string, error) {
+	switch parsedVP.(type) {
+	case *vp.JWTPresentation, *vp.JOSEPresentation:
+	default:
+		return "", nil
+	}
+
+	serialized, err := parsedVP.Serialize()
+	if err != nil {
+		return "", fmt.Errorf("serialize presentation: %w", err)
+	}
+	token, ok := serialized.(string)
+	if !ok {
+		return "", fmt.Errorf("serialized presentation is %T, want string", serialized)
+	}
+
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("presentation is not a JWT")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("decode payload: %w", err)
+	}
+
+	var claims struct {
+		Nonce interface{} `json:"nonce"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return "", fmt.Errorf("unmarshal payload: %w", err)
+	}
+	if claims.Nonce == nil {
+		return "", nil
+	}
+	nonce, ok := claims.Nonce.(string)
+	if !ok {
+		return "", fmt.Errorf("nonce must be a string, got %T", claims.Nonce)
+	}
+
+	return nonce, nil
 }
 
 // extractHolderDIDFromData extracts the holder DID from the unmarshaled VP data.

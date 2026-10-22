@@ -15,6 +15,8 @@ type VPData struct {
 	VCTokens   []string   // required: list of VC-JWT tokens to embed
 	ValidFrom  *time.Time // optional: presentation validity start time
 	ValidUntil *time.Time // optional: presentation validity end time
+	Audience   string     // optional: the verifier the VP is meant for, signed into the "aud" claim
+	Nonce      string     // optional: a value unique to this VP, signed into the "nonce" claim
 }
 
 // VPResponse represents the result of building a Verifiable Presentation.
@@ -28,6 +30,10 @@ type VPResponse struct {
 type VPVerifyResult struct {
 	HolderDID string        // The holder DID from the presentation
 	VCs       []*VCResponse // Raw VC tokens extracted from the presentation
+	// Nonce is the presentation's "nonce" claim, empty when it carries none or
+	// is not a JWT. Callers can refuse a nonce they have already seen to make a
+	// VP single use. Like HolderDID, trust it only with WithVPVerifyProof.
+	Nonce string
 }
 
 // PresentationData represents the VP fields needed by the verifier.
